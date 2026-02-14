@@ -23,11 +23,11 @@
 * **硬件环境**: 4 $\times$ NVIDIA RTX 4090 (Distributed Data Parallel)
 * **评价指标**: 验证集 MSE (Mean Squared Error)
 
-| 模型 Architecture | Test MSE (Lower is better) | MAE |
-| :--- | :---: | :---: |
-| **Swin-iFold (Ours)** | 0.134927(Test Mse); 0.1134(Val MSE) |0.228084  |
-| PatchTST (ICLR 2023) | 0.1290(Test Mse)|  0.222|
-| iTransformer (ICLR 2024)| 0.178(Test Mse) | 0.240|
+| 模型 Architecture | Test MSE (Lower is better) | VAL MSE |MAE |
+| :--- | :---: | :---: | :---: |
+| **Swin-iFold (Ours)** | 0.134927(Test Mse) | 0.1134(Val MSE,myself) |0.228084  |
+| PatchTST (ICLR 2023) | 0.1290(Test Mse,paper) | 0.1333(Val MSE,myself)|  0.222|
+| iTransformer (ICLR 2024)| 0.148(Test Mse,paper) | 0.1218(Val MSE,myself)  | 0.240|
 
 > **结论**: Swin-iFold 以极快的收敛速度和优秀的显存利用率，超越了目前主流的 SOTA 模型，重塑了多变量电力预测的 Baseline。
 
