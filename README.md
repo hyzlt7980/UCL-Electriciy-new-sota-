@@ -25,7 +25,7 @@
 
 | 模型 Architecture | Test MSE (Lower is better) | VAL MSE |MAE |
 | :--- | :---: | :---: | :---: |
-| **Swin-iFold (Ours)** | 0.134927(Test Mse) | 0.1134(Val MSE,myself) |0.228084  |
+| **Swin-iFold (Ours)** | 0.134927(Test Mse, myself) | 0.1134(Val MSE,myself) |0.228084  |
 | PatchTST (ICLR 2023) | 0.1290(Test Mse,paper) | 0.1333(Val MSE,myself)|  0.222|
 | iTransformer (ICLR 2024)| 0.148(Test Mse,paper) | 0.1218(Val MSE,myself)  | 0.240|
 
