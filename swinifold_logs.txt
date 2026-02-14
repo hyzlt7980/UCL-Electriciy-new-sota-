@@ -67,6 +67,31 @@
 ✅ Epoch 27/30 | Train Loss: 0.0504 | Val MSE: 0.1193
 ✅ Epoch 28/30 | Train Loss: 0.0500 | Val MSE: 0.1192
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 -------------------------------------------下边的代码是神级代码，跑进0.115，log在代码下方
 import os, math, random, time, glob, torch, kagglehub
 import numpy as np
@@ -287,7 +312,6 @@ E30 | Train Loss: 0.0443 | Val MSE: 0.117481 | LR: 0.000000
 
 
 
-
 #带噪声去噪的swinifold,
 import os, math, random, time, glob, torch, kagglehub
 import numpy as np
@@ -487,26 +511,240 @@ if __name__ == "__main__": main()
 
 
 
+(base) root@ubuntu22:~# OMP_NUM_THREADS=1 torchrun --nproc_per_node=4 --master_port=29588 test2.py
+📍 数据路径加载成功: /root/.cache/kagglehub/datasets/tylerfarnan/itransformer-datasets/versions/1/iTransformer_datasets/electricity/electricity.csv
+E01 | Train: 0.0848 | Val MSE: 0.150322
+🌟 新纪录！已保存至 v6_best_model.pth
+E02 | Train: 0.0634 | Val MSE: 0.147515
+🌟 新纪录！已保存至 v6_best_model.pth
+E03 | Train: 0.0587 | Val MSE: 0.130501
+🌟 新纪录！已保存至 v6_best_model.pth
+E04 | Train: 0.0564 | Val MSE: 0.124316
+🌟 新纪录！已保存至 v6_best_model.pth
+E05 | Train: 0.0563 | Val MSE: 0.123094
+🌟 新纪录！已保存至 v6_best_model.pth
+E06 | Train: 0.0557 | Val MSE: 0.123713
+E07 | Train: 0.0539 | Val MSE: 0.120723
+🌟 新纪录！已保存至 v6_best_model.pth
+E08 | Train: 0.0527 | Val MSE: 0.121340
+E09 | Train: 0.0519 | Val MSE: 0.119288
+🌟 新纪录！已保存至 v6_best_model.pth
+E10 | Train: 0.0511 | Val MSE: 0.118450
+🌟 新纪录！已保存至 v6_best_model.pth
+E11 | Train: 0.0500 | Val MSE: 0.118312
+🌟 新纪录！已保存至 v6_best_model.pth
+E12 | Train: 0.0497 | Val MSE: 0.117641
+🌟 新纪录！已保存至 v6_best_model.pth
+E13 | Train: 0.0489 | Val MSE: 0.117498
+🌟 新纪录！已保存至 v6_best_model.pth
+E14 | Train: 0.0483 | Val MSE: 0.117166
+🌟 新纪录！已保存至 v6_best_model.pth
+E15 | Train: 0.0476 | Val MSE: 0.116887
+🌟 新纪录！已保存至 v6_best_model.pth
+E16 | Train: 0.0468 | Val MSE: 0.115606
+🌟 新纪录！已保存至 v6_best_model.pth
+E17 | Train: 0.0462 | Val MSE: 0.115785
+E18 | Train: 0.0459 | Val MSE: 0.115058
+🌟 新纪录！已保存至 v6_best_model.pth
+E19 | Train: 0.0454 | Val MSE: 0.114245
+🌟 新纪录！已保存至 v6_best_model.pth
+E20 | Train: 0.0452 | Val MSE: 0.114728
+E21 | Train: 0.0447 | Val MSE: 0.114140
+🌟 新纪录！已保存至 v6_best_model.pth
+E22 | Train: 0.0444 | Val MSE: 0.115260
+E23 | Train: 0.0442 | Val MSE: 0.114028
+🌟 新纪录！已保存至 v6_best_model.pth
+E24 | Train: 0.0438 | Val MSE: 0.113806
+🌟 新纪录！已保存至 v6_best_model.pth
+E25 | Train: 0.0437 | Val MSE: 0.113570
+🌟 新纪录！已保存至 v6_best_model.pth
+E26 | Train: 0.0438 | Val MSE: 0.113402
+🌟 新纪录！已保存至 v6_best_model.pth
+E27 | Train: 0.0436 | Val MSE: 0.113796
+E28 | Train: 0.0433 | Val MSE: 0.113764
+E29 | Train: 0.0433 | Val MSE: 0.113542
+E30 | Train: 0.0433 | Val MSE: 0.113569
 
-(base) root@ubuntu22:~# OMP_NUM_THREADS=1 torchrun --nproc_per_node=4 --master_port=29501 test2.py
-🚀 V6 [DAE + Hierarchical] 启动 | 4090 并行加速
-E01 | Train: 0.0837 | Val MSE: 0.148857
-E02 | Train: 0.0633 | Val MSE: 0.141231
-E03 | Train: 0.0582 | Val MSE: 0.130518
-E04 | Train: 0.0558 | Val MSE: 0.123994
-E05 | Train: 0.0549 | Val MSE: 0.122140
-E06 | Train: 0.0537 | Val MSE: 0.122626
-E07 | Train: 0.0530 | Val MSE: 0.119877
-E08 | Train: 0.0518 | Val MSE: 0.119669
-E09 | Train: 0.0509 | Val MSE: 0.118173
-E10 | Train: 0.0501 | Val MSE: 0.117338
-cE11 | Train: 0.0488 | Val MSE: 0.118415
-E12 | Train: 0.0483 | Val MSE: 0.116321
-E13 | Train: 0.0476 | Val MSE: 0.115904
-E14 | Train: 0.0470 | Val MSE: 0.116366
-E15 | Train: 0.0464 | Val MSE: 0.116245
-E16 | Train: 0.0457 | Val MSE: 0.115799
-E17 | Train: 0.0452 | Val MSE: 0.116928
-E18 | Train: 0.0449 | Val MSE: 0.115194
+
+
+
+
+
+
+
+
+
+##测试集结果
+import os, math, random, time, glob, torch
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
+from sklearn.preprocessing import StandardScaler
+from timm.models.swin_transformer import SwinTransformerBlock
+from timm.layers import Mlp
+
+# ==========================================
+# 1. 核心架构定义 (变量名已严格对齐训练版)
+# ==========================================
+class RevIN(nn.Module):
+    def __init__(self, num_features: int, eps=1e-5, affine=True):
+        super(RevIN, self).__init__()
+        self.num_features = num_features; self.eps = eps; self.affine = affine
+        if self.affine:
+            self.affine_weight = nn.Parameter(torch.ones(num_features))
+            self.affine_bias = nn.Parameter(torch.zeros(num_features))
+    def forward(self, x, mode:str):
+        if mode == 'norm':
+            dim2reduce = tuple(range(len(x.shape)-1))
+            self.mean = torch.mean(x, dim=dim2reduce, keepdim=True).detach()
+            self.stdev = torch.sqrt(torch.var(x, dim=dim2reduce, keepdim=True, unbiased=False) + self.eps).detach()
+            x = (x - self.mean) / self.stdev
+            if self.affine: x = x * self.affine_weight + self.affine_bias
+        elif mode == 'denorm':
+            if self.affine: x = (x - self.affine_bias) / (self.affine_weight + self.eps * self.affine_weight)
+            x = x * self.stdev + self.mean
+        return x
+
+class DenoisingDisruptionBlock(nn.Module):
+    def __init__(self, dim, num_heads=8, noise_level=0.1): 
+        super().__init__()
+        self.norm1 = nn.LayerNorm(dim); self.norm2 = nn.LayerNorm(dim)
+        self.attn = nn.MultiheadAttention(dim, num_heads, batch_first=True)
+        self.mlp = Mlp(in_features=dim, hidden_features=dim*4, out_features=dim)
+        self.noise_level = noise_level
+        self.denoise_loss_fn = nn.MSELoss()
+        self.denoise_proj = nn.Linear(dim, dim)
+    def forward(self, x):
+        # 推理阶段不加噪声
+        attn_out, _ = self.attn(self.norm1(x), self.norm1(x), self.norm1(x))
+        x_p = x + attn_out
+        x_p = x_p + self.mlp(self.norm2(x_p))
+        return x_p, torch.tensor(0.0, device=x.device)
+
+class Swin_iFold_V6(nn.Module):
+    def __init__(self, num_vars=321, embed_dim=128):
+        super().__init__()
+        self.H, self.W = 8, 12; self.revin = RevIN(num_vars); self.patch_embed = nn.Linear(1, embed_dim)
+        
+        # --- Level 1 ---
+        self.l1_swin1 = SwinTransformerBlock(dim=embed_dim, input_resolution=(8,12), num_heads=8, window_size=4, shift_size=0)
+        self.l1_swin2 = SwinTransformerBlock(dim=embed_dim, input_resolution=(8,12), num_heads=8, window_size=4, shift_size=2)
+        self.dae_block = DenoisingDisruptionBlock(embed_dim, num_heads=8, noise_level=0.1)
+        
+        # --- Downsample ---
+        self.reduction = nn.Conv2d(embed_dim, embed_dim * 2, kernel_size=2, stride=2); self.norm = nn.LayerNorm(embed_dim * 2)
+        
+        # --- Level 2 ---
+        self.l2_swins = nn.ModuleList([
+            SwinTransformerBlock(dim=embed_dim * 2, input_resolution=(4,6), num_heads=8, window_size=2, shift_size=0),
+            SwinTransformerBlock(dim=embed_dim * 2, input_resolution=(4,6), num_heads=8, window_size=2, shift_size=1)
+        ])
+        # 此处变量名已修复回 variable_attention
+        self.variable_attention = nn.TransformerEncoderLayer(d_model=embed_dim * 2, nhead=8, dim_feedforward=embed_dim * 8, batch_first=True, norm_first=True)
+        self.head = nn.Linear(embed_dim * 2, 96)
+
+    def forward(self, x):
+        B, L, N = x.shape
+        x = self.revin(x, 'norm')
+        x = self.patch_embed(x.permute(0, 2, 1).reshape(B * N, L, 1)).view(B * N, self.H, self.W, -1)
+        
+        x = self.l1_swin1(x)
+        x = self.l1_swin2(x)
+        x_flat, d_loss = self.dae_block(x.view(B * N, L, -1))
+        x = x_flat.view(B * N, self.H, self.W, -1)
+        
+        # 下采样并展平
+        x = self.reduction(x.permute(0, 3, 1, 2)).flatten(2).transpose(1, 2)
+        x = self.norm(x).view(-1, 4, 6, 256)
+        
+        for blk in self.l2_swins: x = blk(x)
+        feat = x.mean(dim=(1, 2)).view(B, N, -1)
+        feat = self.variable_attention(feat) # 这里也已同步
+        out = self.head(feat).permute(0, 2, 1)
+        return self.revin(out, 'denorm'), d_loss
+
+class ElectricityDataset(Dataset):
+    def __init__(self, csv_path, flag='train'):
+        df_raw = pd.read_csv(csv_path).iloc[:, 1:]
+        n = len(df_raw); tr = int(n*0.7); te = int(n*0.2); val = n - tr - te
+        b1s = [0, tr - 96, n - te - 96]; b2s = [tr, tr + val, n]
+        f_idx = {'train': 0, 'val': 1, 'test': 2}[flag]
+        self.scaler = StandardScaler(); self.scaler.fit(df_raw.iloc[b1s[0]:b2s[0]].values)
+        self.data = self.scaler.transform(df_raw.values)[b1s[f_idx]:b2s[f_idx]]
+    def __getitem__(self, i): return torch.tensor(self.data[i:i+96], dtype=torch.float32), torch.tensor(self.data[i+96:i+192], dtype=torch.float32)
+    def __len__(self): return len(self.data) - 191
+
+# ==========================================
+# 2. 盲测执行函数
+# ==========================================
+def run_final_test(checkpoint_path="v6_best_model.pth"):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"📡 启动测试程序，使用设备: {device}")
+
+    with open(".ds_p.tmp", "r") as f: base_p = f.read().strip()
+    csv_p = glob.glob(os.path.join(base_p, "**", "electricity.csv"), recursive=True)[0]
+    
+    test_ds = ElectricityDataset(csv_p, flag='test')
+    test_loader = DataLoader(test_ds, batch_size=32, shuffle=False)
+    
+    model = Swin_iFold_V6(num_vars=321, embed_dim=128).to(device)
+    
+    # 注意：如果训练时是 DDP 模型，权重名可能会带 'module.' 前缀，
+    # 这里通过一个小 trick 自动处理
+    state_dict = torch.load(checkpoint_path, map_location=device)
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        name = k[7:] if k.startswith('module.') else k # 去掉 module. 前缀
+        new_state_dict[name] = v
+        
+    model.load_state_dict(new_state_dict)
+    model.eval()
+    print(f"✅ 加载权重成功: {checkpoint_path}")
+
+    total_mse, total_mae = 0, 0
+    preds_to_plot, true_to_plot = None, None
+    
+    with torch.no_grad():
+        for i, (bx, by) in enumerate(test_loader):
+            bx, by = bx.to(device), by.to(device)
+            pred, _ = model(bx) 
+            total_mse += F.mse_loss(pred, by).item()
+            total_mae += F.l1_loss(pred, by).item()
+            if i == 50: # 换个 batch 看看预测效果
+                preds_to_plot = pred.cpu().numpy()
+                true_to_plot = by.cpu().numpy()
+
+    avg_mse = total_mse / len(test_loader)
+    avg_mae = total_mae / len(test_loader)
+
+    print("-" * 30)
+    print(f"🏆 【最终测试集盲测成绩】")
+    print(f"📊 Test MSE: {avg_mse:.6f}")
+    print(f"📈 Test MAE: {avg_mae:.6f}")
+    print("-" * 30)
+
+    # 绘制可视化曲线
+    plt.figure(figsize=(10, 4))
+    plt.plot(true_to_plot[0, :, 0], label='Actual', color='blue', alpha=0.5, linewidth=2)
+    plt.plot(preds_to_plot[0, :, 0], label='V6 Predict', color='red', linestyle='--', linewidth=2)
+    plt.legend(); plt.grid(True, alpha=0.3); plt.title("Swin-iFold V6 Final Test Prediction")
+    plt.savefig("test_prediction_final.png")
+    print("🎨 预测对比图已保存: test_prediction_final.png")
+
+if __name__ == "__main__":
+    run_final_test()
+
+(base) root@ubuntu22:~# python eval_test.py 
+📡 启动测试程序，使用设备: cuda
+✅ 加载权重成功: v6_best_model.pth
+------------------------------
+🏆 【最终测试集盲测成绩】
+📊 Test MSE: 0.134927
+📈 Test MAE: 0.228084
+------------------------------
+
 
 
