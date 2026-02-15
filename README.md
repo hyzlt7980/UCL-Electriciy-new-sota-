@@ -8,7 +8,7 @@
 
 ![Swin-iFold Architecture](./architecture.png) *()*
 ![Swin-iFold Architecture-hand drawing](./swinifold-hand-draw.png) *()*
-![swin-shift-window-attention](./swin-shift-window-attention.png) *()*
+![swin-shift-window-attention](./swin-shift-window-attention.png) *()* 
 
 ## 🚀 核心创新 (Key Innovations)
 
