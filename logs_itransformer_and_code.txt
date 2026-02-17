@@ -342,6 +342,12 @@ Setting OMP_NUM_THREADS environment variable for each process to be 1 in default
 ✅ Epoch 28/30 | Train Huber: 0.0632 | Val MSE: 0.1280
 ✅ Epoch 29/30 | Train Huber: 0.0634 | Val MSE: 0.1277
 ✅ Epoch 30/30 | Train Huber: 0.0636 | Val MSE: 0.1278
+
+🏁 Training Finished. Evaluating on Test Set...
+🏆 TEST RESULTS: MSE: 0.14905 | MAE: 0.23984
+
+
+
 import os, math, random, time, glob, torch, kagglehub
 import numpy as np
 import pandas as pd
