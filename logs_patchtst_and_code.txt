@@ -308,6 +308,126 @@ Epoch [30/30] | Val MSE: 0.16483
 
 =================================================================================================================================================================
 这个代码是gemini自己实现的patchtst, 但是patch=12，stride=4. 效果来说应该会比 patch=16,stride=4好点.
+🏁 Final Test Phase...
+🏆 TEST RESULT | MSE: 0.16090 | MAE: 0.25054
+果然，这个是patchtst官方版，gemini版里最好的一版，test mse达到了0.16090,但是test mse还是不如我的swinfold变体，0.134.
+
+
+
+(base) root@ubuntu22:~# torchrun --nproc_per_node=4 patch_tst_official.py #忽略name,这个是gemini实现的patchtst
+W0217 21:38:05.248000 6384 site-packages/torch/distributed/run.py:852] 
+W0217 21:38:05.248000 6384 site-packages/torch/distributed/run.py:852] *****************************************
+W0217 21:38:05.248000 6384 site-packages/torch/distributed/run.py:852] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0217 21:38:05.248000 6384 site-packages/torch/distributed/run.py:852] *****************************************
+/root/anaconda3/lib/python3.11/site-packages/torch/distributed/c10d_logger.py:83: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  return func(*args, **kwargs)
+[rank0]:[W217 21:38:08.916779633 ProcessGroupNCCL.cpp:5138] Guessing device ID based on global rank. This can cause a hang if rank to GPU mapping is heterogeneous. You can specify device_id in init_process_group()
+🚀 Official PatchTST (High-Res 12/4 + d_model 256) | 100 Epochs | Huber Engine Start!
+✅ Epoch 001/100 | Val MSE: 0.17837
+✅ Epoch 002/100 | Val MSE: 0.17211
+✅ Epoch 003/100 | Val MSE: 0.16960
+✅ Epoch 004/100 | Val MSE: 0.16271
+✅ Epoch 005/100 | Val MSE: 0.16163
+✅ Epoch 006/100 | Val MSE: 0.16059
+✅ Epoch 007/100 | Val MSE: 0.15233
+✅ Epoch 008/100 | Val MSE: 0.14983
+✅ Epoch 009/100 | Val MSE: 0.14714
+✅ Epoch 010/100 | Val MSE: 0.14465
+✅ Epoch 011/100 | Val MSE: 0.14427
+✅ Epoch 012/100 | Val MSE: 0.14157
+✅ Epoch 013/100 | Val MSE: 0.13927
+✅ Epoch 014/100 | Val MSE: 0.13963
+✅ Epoch 015/100 | Val MSE: 0.13904
+✅ Epoch 016/100 | Val MSE: 0.14019
+✅ Epoch 017/100 | Val MSE: 0.13919
+✅ Epoch 018/100 | Val MSE: 0.13648
+✅ Epoch 019/100 | Val MSE: 0.13545
+✅ Epoch 020/100 | Val MSE: 0.13967
+✅ Epoch 021/100 | Val MSE: 0.13647
+✅ Epoch 022/100 | Val MSE: 0.13722
+✅ Epoch 023/100 | Val MSE: 0.13715
+✅ Epoch 024/100 | Val MSE: 0.13710
+✅ Epoch 025/100 | Val MSE: 0.13593
+✅ Epoch 026/100 | Val MSE: 0.13776
+✅ Epoch 027/100 | Val MSE: 0.13450
+✅ Epoch 028/100 | Val MSE: 0.13602
+✅ Epoch 029/100 | Val MSE: 0.13733
+✅ Epoch 030/100 | Val MSE: 0.13465
+✅ Epoch 031/100 | Val MSE: 0.13534
+✅ Epoch 032/100 | Val MSE: 0.13676
+✅ Epoch 033/100 | Val MSE: 0.13552
+✅ Epoch 034/100 | Val MSE: 0.13806
+✅ Epoch 035/100 | Val MSE: 0.13780
+✅ Epoch 036/100 | Val MSE: 0.14054
+✅ Epoch 037/100 | Val MSE: 0.13946
+✅ Epoch 038/100 | Val MSE: 0.13891
+✅ Epoch 039/100 | Val MSE: 0.13954
+✅ Epoch 040/100 | Val MSE: 0.13823
+✅ Epoch 041/100 | Val MSE: 0.13936
+✅ Epoch 042/100 | Val MSE: 0.13809
+✅ Epoch 043/100 | Val MSE: 0.13956
+✅ Epoch 044/100 | Val MSE: 0.14122
+✅ Epoch 045/100 | Val MSE: 0.13937
+✅ Epoch 046/100 | Val MSE: 0.14014
+✅ Epoch 047/100 | Val MSE: 0.13892
+✅ Epoch 048/100 | Val MSE: 0.13767
+✅ Epoch 049/100 | Val MSE: 0.14299
+✅ Epoch 050/100 | Val MSE: 0.14192
+✅ Epoch 051/100 | Val MSE: 0.14127
+✅ Epoch 052/100 | Val MSE: 0.14303
+✅ Epoch 053/100 | Val MSE: 0.14329
+✅ Epoch 054/100 | Val MSE: 0.14151
+✅ Epoch 055/100 | Val MSE: 0.14080
+✅ Epoch 056/100 | Val MSE: 0.13977
+✅ Epoch 057/100 | Val MSE: 0.14277
+✅ Epoch 058/100 | Val MSE: 0.14106
+✅ Epoch 059/100 | Val MSE: 0.14074
+✅ Epoch 060/100 | Val MSE: 0.14162
+✅ Epoch 061/100 | Val MSE: 0.14153
+✅ Epoch 062/100 | Val MSE: 0.14374
+✅ Epoch 063/100 | Val MSE: 0.14351
+✅ Epoch 064/100 | Val MSE: 0.14376
+✅ Epoch 065/100 | Val MSE: 0.14149
+✅ Epoch 066/100 | Val MSE: 0.14215
+✅ Epoch 067/100 | Val MSE: 0.14443
+✅ Epoch 068/100 | Val MSE: 0.14335
+✅ Epoch 069/100 | Val MSE: 0.14253
+✅ Epoch 070/100 | Val MSE: 0.14328
+✅ Epoch 071/100 | Val MSE: 0.14415
+✅ Epoch 072/100 | Val MSE: 0.14313
+✅ Epoch 073/100 | Val MSE: 0.14335
+✅ Epoch 074/100 | Val MSE: 0.14544
+✅ Epoch 075/100 | Val MSE: 0.14330
+✅ Epoch 076/100 | Val MSE: 0.14428
+✅ Epoch 077/100 | Val MSE: 0.14306
+✅ Epoch 078/100 | Val MSE: 0.14438
+✅ Epoch 079/100 | Val MSE: 0.14341
+✅ Epoch 080/100 | Val MSE: 0.14418
+✅ Epoch 081/100 | Val MSE: 0.14401
+✅ Epoch 082/100 | Val MSE: 0.14388
+✅ Epoch 083/100 | Val MSE: 0.14380
+✅ Epoch 084/100 | Val MSE: 0.14453
+✅ Epoch 085/100 | Val MSE: 0.14408
+✅ Epoch 086/100 | Val MSE: 0.14433
+✅ Epoch 087/100 | Val MSE: 0.14435
+✅ Epoch 088/100 | Val MSE: 0.14484
+✅ Epoch 089/100 | Val MSE: 0.14459
+✅ Epoch 090/100 | Val MSE: 0.14383
+✅ Epoch 091/100 | Val MSE: 0.14429
+✅ Epoch 092/100 | Val MSE: 0.14406
+✅ Epoch 093/100 | Val MSE: 0.14429
+✅ Epoch 094/100 | Val MSE: 0.14442
+✅ Epoch 095/100 | Val MSE: 0.14444
+✅ Epoch 096/100 | Val MSE: 0.14399
+✅ Epoch 097/100 | Val MSE: 0.14437
+✅ Epoch 098/100 | Val MSE: 0.14416
+✅ Epoch 099/100 | Val MSE: 0.14393
+✅ Epoch 100/100 | Val MSE: 0.14395
+/root/anaconda3/lib/python3.11/site-packages/torch/distributed/c10d_logger.py:83: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  return func(*args, **kwargs)
+
+🏁 Final Test Phase...
+🏆 TEST RESULT | MSE: 0.16090 | MAE: 0.25054
 
 
 
