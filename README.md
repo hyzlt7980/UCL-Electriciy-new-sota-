@@ -29,8 +29,8 @@ fdafafsfs
 | 模型 Architecture | 论文数据 (Val Mse, Test Mse) | 自己实现(Val Mse, Test Mse)|
 | :--- | :---: | :---: | 
 | **Swin-iFold (Ours)** | (not available,not avaiable) | ( 0.113402,0.134927) |
-| PatchTST (ICLR 2023) |(not available, 0.1290)|     | (around 0.161,0.18667)|
-| iTransformer (ICLR 2024)| (not available, 0.148)|  | ( 0.1225, 0.14889)|
+| PatchTST (ICLR 2023) |(not available, 0.1290)    | (around 0.161,0.18667)|
+| iTransformer (ICLR 2024)| (not available, 0.148)  | ( 0.1225, 0.14889)|
 
 > **结论**: Swin-iFold 以极快的收敛速度和优秀的显存利用率，超越了目前主流的 SOTA 模型，重塑了多变量电力预测的 Baseline。
 
