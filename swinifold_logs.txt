@@ -744,6 +744,390 @@ if __name__ == "__main__":
 🏆 【最终测试集盲测成绩】
 📊 Test MSE: 0.134927
 📈 Test MAE: 0.228084
+
+
+
+
+
+
+
+
+
+
+
+==================================================================================================================================================================================
+base) root@ubuntu22:~# torchrun --nproc_per_node=4 swinifold.py
+W0218 02:24:19.105000 6481 site-packages/torch/distributed/run.py:793] 
+W0218 02:24:19.105000 6481 site-packages/torch/distributed/run.py:793] *****************************************
+W0218 02:24:19.105000 6481 site-packages/torch/distributed/run.py:793] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0218 02:24:19.105000 6481 site-packages/torch/distributed/run.py:793] *****************************************
+[rank0]:[W218 02:24:22.973160678 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 0]  using GPU 0 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+[rank2]:[W218 02:24:22.990939909 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 2]  using GPU 2 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+[rank1]:[W218 02:24:22.991651293 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 1]  using GPU 1 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+[rank3]:[W218 02:24:22.991802182 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 3]  using GPU 3 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+============================================================
+🚀 V6 [真·双重防御版] 启动 | 基础噪声 + 混合破坏 DAE
+============================================================
+E01 | Time: 61.9s | T-Loss: 0.0809 | DAE-Loss: 0.11458 | Val MSE: 0.150839 🌟 New Best
+E02 | Time: 61.3s | T-Loss: 0.0619 | DAE-Loss: 0.23455 | Val MSE: 0.145654 🌟 New Best
+E03 | Time: 61.4s | T-Loss: 0.0580 | DAE-Loss: 0.33443 | Val MSE: 0.132131 🌟 New Best
+E04 | Time: 61.2s | T-Loss: 0.0561 | DAE-Loss: 0.32876 | Val MSE: 0.127597 🌟 New Best
+E05 | Time: 61.4s | T-Loss: 0.0552 | DAE-Loss: 0.32138 | Val MSE: 0.126774 🌟 New Best
+E06 | Time: 61.4s | T-Loss: 0.0537 | DAE-Loss: 0.29068 | Val MSE: 0.124729 🌟 New Best
+E07 | Time: 61.4s | T-Loss: 0.0528 | DAE-Loss: 0.23114 | Val MSE: 0.121589 🌟 New Best
+E08 | Time: 61.3s | T-Loss: 0.0514 | DAE-Loss: 0.18572 | Val MSE: 0.123512 
+E09 | Time: 61.6s | T-Loss: 0.0504 | DAE-Loss: 0.15257 | Val MSE: 0.119850 🌟 New Best
+E10 | Time: 61.5s | T-Loss: 0.0495 | DAE-Loss: 0.14164 | Val MSE: 0.118757 🌟 New Best
+E11 | Time: 62.1s | T-Loss: 0.0482 | DAE-Loss: 0.14050 | Val MSE: 0.118805 
+E12 | Time: 61.3s | T-Loss: 0.0479 | DAE-Loss: 0.13748 | Val MSE: 0.117813 🌟 New Best
+E13 | Time: 61.6s | T-Loss: 0.0469 | DAE-Loss: 0.13145 | Val MSE: 0.117504 🌟 New Best
+E14 | Time: 61.5s | T-Loss: 0.0464 | DAE-Loss: 0.12284 | Val MSE: 0.116882 🌟 New Best
+E15 | Time: 61.4s | T-Loss: 0.0458 | DAE-Loss: 0.12044 | Val MSE: 0.116179 🌟 New Best
+E16 | Time: 61.3s | T-Loss: 0.0450 | DAE-Loss: 0.11797 | Val MSE: 0.115395 🌟 New Best
+E17 | Time: 61.4s | T-Loss: 0.0443 | DAE-Loss: 0.11217 | Val MSE: 0.115882 
+E18 | Time: 61.4s | T-Loss: 0.0441 | DAE-Loss: 0.11035 | Val MSE: 0.114761 🌟 New Best
+E19 | Time: 61.4s | T-Loss: 0.0435 | DAE-Loss: 0.10623 | Val MSE: 0.114218 🌟 New Best
+E20 | Time: 61.4s | T-Loss: 0.0432 | DAE-Loss: 0.10083 | Val MSE: 0.113839 🌟 New Best
+E21 | Time: 61.4s | T-Loss: 0.0427 | DAE-Loss: 0.10087 | Val MSE: 0.114327 
+E22 | Time: 61.4s | T-Loss: 0.0423 | DAE-Loss: 0.09685 | Val MSE: 0.113924 
+E23 | Time: 61.4s | T-Loss: 0.0421 | DAE-Loss: 0.09340 | Val MSE: 0.113876 
+E24 | Time: 61.6s | T-Loss: 0.0417 | DAE-Loss: 0.09380 | Val MSE: 0.113330 🌟 New Best
+E25 | Time: 61.4s | T-Loss: 0.0415 | DAE-Loss: 0.09416 | Val MSE: 0.113164 🌟 New Best
+E26 | Time: 61.4s | T-Loss: 0.0415 | DAE-Loss: 0.09274 | Val MSE: 0.113177 
+E27 | Time: 61.4s | T-Loss: 0.0415 | DAE-Loss: 0.09142 | Val MSE: 0.112972 🌟 New Best
+E28 | Time: 61.3s | T-Loss: 0.0412 | DAE-Loss: 0.09106 | Val MSE: 0.112921 🌟 New Best
+E29 | Time: 61.3s | T-Loss: 0.0412 | DAE-Loss: 0.09101 | Val MSE: 0.112767 🌟 New Best
+E30 | Time: 61.4s | T-Loss: 0.0412 | DAE-Loss: 0.09098 | Val MSE: 0.112703 🌟 New Best
+
+============================================================
+🏆 训练结束！加载最佳权重 [best_v6_dae_true.pth] 进行终测...
+============================================================
+============================================================
+🏆 训练结束！加载最佳权重 [best_v6_dae_true.pth] 进行终测...
+============================================================
+============================================================
+🏆 训练结束！加载最佳权重 [best_v6_dae_true.pth] 进行终测...
+============================================================
+
+
+============================================================
+🏆 训练结束！加载最佳权重 [best_v6_dae_true.pth] 进行终测...
+============================================================
+
+/root/swinifold.py:265: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  model.module.load_state_dict(torch.load("best_v6_dae_true.pth", map_location=f"cuda:{local_rank}"))
+/root/swinifold.py:265: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  model.module.load_state_dict(torch.load("best_v6_dae_true.pth", map_location=f"cuda:{local_rank}"))
+/root/swinifold.py:265: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  model.module.load_state_dict(torch.load("best_v6_dae_true.pth", map_location=f"cuda:{local_rank}"))
+/root/swinifold.py:265: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  model.module.load_state_dict(torch.load("best_v6_dae_true.pth", map_location=f"cuda:{local_rank}"))
+📊 【最终双重防御开奖】
+🔥 TEST MSE: 0.133400
+📉 Best Val MSE: 0.112703
+
+
+# ======================================================================
+# Swin-iFold V6 [真·双重防御版] 
+# 拓扑：Swin1 -> 基础噪声(0.025) -> Swin2 -> 混合噪声破坏(2.5%) -> DAE 极限重构
+# ======================================================================
+import os, math, random, time, glob, torch, kagglehub
+import numpy as np
+import pandas as pd
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import Dataset, DataLoader
+from torch.amp import autocast
+from sklearn.preprocessing import StandardScaler
+from timm.models.swin_transformer import SwinTransformerBlock
+from timm.layers import Mlp
+
+# ==========================================
+# 0. 极致性能配置
+# ==========================================
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+torch.backends.cudnn.benchmark = True
+
+# ==========================================
+# 1. 核心组件：DAE 重建块
+# ==========================================
+class DenoisingDisruptionBlock(nn.Module):
+    def __init__(self, dim, num_heads=8): 
+        super().__init__()
+        self.norm1 = nn.LayerNorm(dim)
+        self.attn = nn.MultiheadAttention(dim, num_heads, batch_first=True)
+        self.norm2 = nn.LayerNorm(dim)
+        self.mlp = Mlp(in_features=dim, hidden_features=dim*4, out_features=dim)
+        self.denoise_loss_fn = nn.MSELoss()
+        self.denoise_proj = nn.Linear(dim, dim)
+        
+    def forward(self, x_noisy, x_clean_target=None):
+        attn_out, _ = self.attn(self.norm1(x_noisy), self.norm1(x_noisy), self.norm1(x_noisy))
+        x_p = x_noisy + attn_out
+        x_p = x_p + self.mlp(self.norm2(x_p))
+        
+        # 训练阶段：DAE 努力将破损特征还原为 clean_target
+        if self.training and x_clean_target is not None: 
+            # 使用 detach() 阻断重构损失向 Swin 层的回传
+            d_loss = self.denoise_loss_fn(self.denoise_proj(x_p), x_clean_target.detach())
+            return x_p, d_loss
+            
+        return x_p, torch.tensor(0.0, device=x_noisy.device)
+
+# ==========================================
+# 2. 真实架构 (双重噪声注入)
+# ==========================================
+class Swin_iFold_V6(nn.Module):
+    def __init__(self, num_vars=321, embed_dim=128, noise_level=0.02): 
+        super().__init__()
+        self.H, self.W = 8, 12 
+        self.revin = RevIN(num_vars)
+        self.patch_embed = nn.Linear(1, embed_dim)
+        self.noise_level = noise_level
+        
+        # Level 1 Swin 模块配置
+        self.l1_swin1 = SwinTransformerBlock(dim=embed_dim, input_resolution=(8, 12), num_heads=8, window_size=4, shift_size=0, proj_drop=0.025, attn_drop=0.025)
+        self.l1_swin2 = SwinTransformerBlock(dim=embed_dim, input_resolution=(8, 12), num_heads=8, window_size=4, shift_size=2, proj_drop=0.025, attn_drop=0.025)
+        
+        # DAE 位于 Level 1 结尾
+        self.dae_block = DenoisingDisruptionBlock(embed_dim, num_heads=8)
+        
+        self.reduction = nn.Conv2d(embed_dim, embed_dim * 2, kernel_size=2, stride=2)
+        self.norm = nn.LayerNorm(embed_dim * 2)
+        
+        self.l2_swins = nn.ModuleList([
+            SwinTransformerBlock(dim=embed_dim * 2, input_resolution=(4, 6), num_heads=8, window_size=2, shift_size=0, proj_drop=0.025, attn_drop=0.025),
+            SwinTransformerBlock(dim=embed_dim * 2, input_resolution=(4, 6), num_heads=8, window_size=2, shift_size=1, proj_drop=0.025, attn_drop=0.025)
+        ])
+        
+        self.variable_attention = nn.TransformerEncoderLayer(
+            d_model=embed_dim * 2, nhead=8, dim_feedforward=embed_dim * 8, batch_first=True, norm_first=True, dropout=0.05
+        )
+        self.head = nn.Linear(embed_dim * 2, 96)
+
+    def inject_mixed_noise(self, x):
+        """为 DAE 准备的 2:4:4 毁灭性结构化混合噪声"""
+        x_noisy = x.clone()
+        rand_probs = torch.rand_like(x)
+        
+        # 1. 20% 份额的高斯噪声 (✅ 彻底修复 In-place 梯度截断 Bug)
+        gauss_mask = rand_probs < (self.noise_level * 0.2)
+        gauss_noise = torch.randn_like(x) * (self.noise_level) 
+        x_noisy = torch.where(gauss_mask, x_noisy + gauss_noise, x_noisy)
+        
+        # 2. 40% 份额的脉冲极值噪声
+        pulse_mask = (rand_probs >= (self.noise_level * 0.2)) & (rand_probs < (self.noise_level * 0.6))
+        spikes = torch.where(torch.rand_like(x) > 0.5, x.max(), x.min())
+        x_noisy = torch.where(pulse_mask, spikes, x_noisy)
+        
+        # 3. 40% 份额的漂移缩放噪声
+        drift_mask = (rand_probs >= (self.noise_level * 0.6)) & (rand_probs < self.noise_level)
+        scales = 1.0 + torch.randn_like(x) * (self.noise_level)
+        x_noisy = torch.where(drift_mask, x_noisy * scales, x_noisy)
+        
+        return x_noisy
+
+    def forward(self, x):
+        B, L, N = x.shape
+        x = self.revin(x, 'norm')
+        x = self.patch_embed(x.permute(0, 2, 1).reshape(B * N, L, 1)).view(B * N, self.H, self.W, -1)
+        
+        # ✅ 第一重防御：Swin1 提取初步特征
+        x = self.l1_swin1(x)
+        
+        # ✅ 注入第一级微剂量底盘噪声 (防过拟合)
+        if self.training:
+            x = x + torch.randn_like(x) * self.noise_level*0.75
+            
+        # ✅ Swin2 跨窗口局部特征交互，输出“干净靶标”
+        x_clean_target = self.l1_swin2(x)
+        
+        # ✅ 第二重防御：为 DAE 注入 2.5% 覆盖率的混合结构化破坏
+        if self.training:
+            x_noisy = self.inject_mixed_noise(x_clean_target)
+        else:
+            x_noisy = x_clean_target
+            
+        # ✅ DAE 全局精修与 Loss 计算
+        x_flat, d_loss = self.dae_block(x_noisy.view(B * N, L, -1), x_clean_target.view(B * N, L, -1))
+        x = x_flat.view(B * N, self.H, self.W, -1)
+        
+        # --- 下采样与 Level 2 变量博弈 ---
+        x = self.reduction(x.permute(0, 3, 1, 2)).flatten(2).transpose(1, 2)
+        x = self.norm(x).view(-1, 4, 6, 256)
+        
+        for blk in self.l2_swins: x = blk(x)
+        
+        feat = x.mean(dim=(1, 2)).view(B, N, -1)
+        feat = self.variable_attention(feat)
+        out = self.head(feat).permute(0, 2, 1)
+        
+        return self.revin(out, 'denorm'), d_loss
+
+# ==========================================
+# 3. 辅助组件
+# ==========================================
+class RevIN(nn.Module):
+    def __init__(self, num_features: int, eps=1e-5, affine=True):
+        super(RevIN, self).__init__()
+        self.num_features = num_features; self.eps = eps; self.affine = affine
+        if self.affine:
+            self.affine_weight = nn.Parameter(torch.ones(self.num_features))
+            self.affine_bias = nn.Parameter(torch.zeros(self.num_features))
+            
+    def forward(self, x, mode:str):
+        if mode == 'norm':
+            dim2reduce = tuple(range(len(x.shape)-1))
+            self.mean = torch.mean(x, dim=dim2reduce, keepdim=True).detach()
+            self.stdev = torch.sqrt(torch.var(x, dim=dim2reduce, keepdim=True, unbiased=False) + self.eps).detach()
+            x = (x - self.mean) / self.stdev
+            if self.affine: x = x * self.affine_weight + self.affine_bias
+        elif mode == 'denorm':
+            # ✅ 已修复的除零 Bug
+            if self.affine: x = (x - self.affine_bias) / (self.affine_weight + self.eps)
+            x = x * self.stdev + self.mean
+        return x
+
+class ElectricityDataset(Dataset):
+    def __init__(self, csv_path, flag='train'):
+        df_raw = pd.read_csv(csv_path).iloc[:, 1:]
+        n = len(df_raw); tr = int(n*0.7); te = int(n*0.2); val = n - tr - te
+        b1s = [0, tr - 96, n - te - 96]; b2s = [tr, tr + val, n]
+        f_idx = {'train': 0, 'val': 1, 'test': 2}[flag]
+        
+        self.scaler = StandardScaler(); self.scaler.fit(df_raw.iloc[0:tr].values) 
+        self.data = self.scaler.transform(df_raw.values)[b1s[f_idx]:b2s[f_idx]]
+        
+    def __getitem__(self, i):
+        return torch.tensor(self.data[i:i+96], dtype=torch.float32), torch.tensor(self.data[i+96:i+192], dtype=torch.float32)
+        
+    def __len__(self): return len(self.data) - 191
+
+# ==========================================
+# 4. 分布式主程序 + 自动开奖
+# ==========================================
+def main():
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    dist.init_process_group("nccl"); torch.cuda.set_device(local_rank)
+    
+    dataset_path_file = ".kaggle_path.tmp"
+    if local_rank == 0:
+        if not os.path.exists(dataset_path_file):
+            path = kagglehub.dataset_download("tylerfarnan/itransformer-datasets")
+            with open(dataset_path_file, "w") as f: f.write(path)
+    dist.barrier()
+    with open(dataset_path_file, "r") as f: 
+        csv_p = glob.glob(os.path.join(f.read().strip(), "**", "electricity.csv"), recursive=True)[0]
+
+    GLOBAL_BS = 8
+    train_loader = DataLoader(ElectricityDataset(csv_p, 'train'), batch_size=GLOBAL_BS//dist.get_world_size(), sampler=DistributedSampler(ElectricityDataset(csv_p, 'train')), num_workers=2, pin_memory=True)
+    val_loader = DataLoader(ElectricityDataset(csv_p, 'val'), batch_size=GLOBAL_BS//dist.get_world_size(), sampler=DistributedSampler(ElectricityDataset(csv_p, 'val'), shuffle=False), num_workers=2, pin_memory=True)
+    test_loader = DataLoader(ElectricityDataset(csv_p, 'test'), batch_size=GLOBAL_BS//dist.get_world_size(), sampler=DistributedSampler(ElectricityDataset(csv_p, 'test'), shuffle=False), num_workers=2, pin_memory=True)
+
+    # 甜点区噪声强度 0.025
+    model = Swin_iFold_V6(num_vars=321, embed_dim=128, noise_level=0.025).to(local_rank)
+    model = DDP(model, device_ids=[local_rank], broadcast_buffers=False)
+    
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-5)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=30)
+    criterion = nn.HuberLoss(delta=0.5)
+
+    if local_rank == 0: print(f"{'='*60}\n🚀 V6 [真·双重防御版] 启动 | 基础噪声 + 混合破坏 DAE\n{'='*60}")
+
+    best_val_mse = float('inf')
+    for epoch in range(30):
+        train_loader.sampler.set_epoch(epoch); model.train()
+        epoch_main_loss = 0; epoch_d_loss = 0; t0 = time.time()
+        
+        for bx, by in train_loader:
+            bx, by = bx.to(local_rank), by.to(local_rank)
+            optimizer.zero_grad(set_to_none=True)
+            
+            with autocast(device_type='cuda', dtype=torch.bfloat16):
+                pred, d_loss = model(bx)
+                main_loss = criterion(pred, by)
+                total_loss = main_loss + 0.1 * d_loss.mean()
+            
+            # ✅ 剥离 autocast 以保证梯度精度
+            total_loss.backward()
+            optimizer.step()
+            
+            epoch_main_loss += main_loss.item()
+            epoch_d_loss += d_loss.mean().item()
+            
+        model.eval(); local_mse_sum, local_samples = torch.tensor(0.0, device=local_rank), torch.tensor(0.0, device=local_rank)
+        with torch.no_grad():
+            for vbx, vby in val_loader:
+                vbx, vby = vbx.to(local_rank), vby.to(local_rank)
+                with autocast(device_type='cuda', dtype=torch.bfloat16):
+                    p, _ = model(vbx)
+                local_mse_sum += F.mse_loss(p, vby) * vbx.size(0)
+                local_samples += vbx.size(0)
+                
+        dist.all_reduce(local_mse_sum); dist.all_reduce(local_samples)
+        avg_val_mse = (local_mse_sum / local_samples).item()
+        
+        if local_rank == 0:
+            avg_m_loss = epoch_main_loss / len(train_loader)
+            avg_d_loss = epoch_d_loss / len(train_loader)
+            status = "🌟 New Best" if avg_val_mse < best_val_mse else ""
+            print(f"E{epoch+1:02d} | Time: {time.time()-t0:.1f}s | T-Loss: {avg_m_loss:.4f} | DAE-Loss: {avg_d_loss:.5f} | Val MSE: {avg_val_mse:.6f} {status}")
+            
+            if avg_val_mse < best_val_mse:
+                best_val_mse = avg_val_mse
+                torch.save(model.module.state_dict(), "best_v6_dae_true.pth")
+                
+        scheduler.step()
+        # ✅ 同步墙：防止 Rank 0 还在保存硬盘时，其他卡抢跑导致通信挂起
+        dist.barrier()
+
+    # ==========================================
+    # 🏁 终极开奖
+    # ==========================================
+    dist.barrier()
+    
+    print(f"\n{'='*60}\n🏆 训练结束！加载最佳权重 [best_v6_dae_true.pth] 进行终测...\n{'='*60}")
+    model.module.load_state_dict(torch.load("best_v6_dae_true.pth", map_location=f"cuda:{local_rank}"))
+    
+    model.eval()
+    t_mse, t_samples = torch.tensor(0.0, device=local_rank), torch.tensor(0.0, device=local_rank)
+    with torch.no_grad():
+        for tbx, tby in test_loader:
+            tbx, tby = tbx.to(local_rank), tby.to(local_rank)
+            with autocast(device_type='cuda', dtype=torch.bfloat16):
+                p, _ = model(tbx)
+            t_mse += F.mse_loss(p, tby) * tbx.size(0)
+            t_samples += tbx.size(0)
+            
+    dist.all_reduce(t_mse); dist.all_reduce(t_samples)
+
+    if local_rank == 0:
+        final_test_mse = (t_mse/t_samples).item()
+        print(f"📊 【最终双重防御开奖】\n🔥 TEST MSE: {final_test_mse:.6f}\n📉 Best Val MSE: {best_val_mse:.6f}\n{'='*60}")
+
+if __name__ == "__main__": main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ------------------------------
 
 
