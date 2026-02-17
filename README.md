@@ -6,6 +6,8 @@
 
 **Swin-iFold** 是一种针对多变量时间序列预测（Multivariate Time Series Forecasting）设计的全新极简架构。它巧妙地结合了计算机视觉中的 **Swin Transformer** 与时序领域的 **iTransformer** 思想，通过“一维折叠（1D-to-2D Folding）”技术，极大地提升了模型对局部周期性和全局变量间依赖的捕捉能力。
 
+fdafafsfs
+
 ![Swin-iFold Architecture](./architecture.png) *()*
 ![Swin-iFold Architecture-hand drawing](./swinifold.png) *()*
 ![swin-shift-window-attention](./swin-shift-window-attention.png) *()* 
@@ -24,11 +26,11 @@
 * **硬件环境**: 4 $\times$ NVIDIA RTX 4090 (Distributed Data Parallel)
 * **评价指标**: 验证集 MSE (Mean Squared Error)
 
-| 模型 Architecture | Test MSE (Lower is better) | VAL MSE |MAE |
-| :--- | :---: | :---: | :---: |
-| **Swin-iFold (Ours)** | 0.134927(Test Mse, myself) | 0.1134(Val MSE,myself) |0.228084  |
-| PatchTST (ICLR 2023) | 0.1290(Test Mse,paper) | 0.1333(Val MSE,myself)|  0.222|
-| iTransformer (ICLR 2024)| 0.148(Test Mse,paper) | 0.1218(Val MSE,myself)  | 0.240|
+| 模型 Architecture | 论文数据 (Val Mse, Test Mse) | 自己实现(Val Mse, Test Mse)|
+| :--- | :---: | :---: | :---: |:---: |
+| **Swin-iFold (Ours)** | (not available,not avaiable) | ( 0.113402,0.134927) |
+| PatchTST (ICLR 2023) |(not available, 0.1290)|     | (应该在0161,0.18667)|
+| iTransformer (ICLR 2024)| (not available, 0.148)|  | ( 0.1225, 0.14889)|
 
 > **结论**: Swin-iFold 以极快的收敛速度和优秀的显存利用率，超越了目前主流的 SOTA 模型，重塑了多变量电力预测的 Baseline。
 
