@@ -1,12 +1,4 @@
-#第一份代码是gemini写的，第二份是官方的, 但是gemini做了简单调整
-
-
-
-
-
-
-
-
+#第一份代码是gemini写的，第二份是官方的, 但是gemini做了简单调整，两份的test mse都是0.14=0.15之间，没有我的swinifold的0.13-0.135好
 
 
 (base) root@ubuntu22:~# torchrun --nproc_per_node=4 test2.py
