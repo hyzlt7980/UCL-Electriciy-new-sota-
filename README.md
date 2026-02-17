@@ -11,7 +11,7 @@ Swin-iFold变体在electricity数据集上的Test mse为0.132-0.135，Test Mse �
 
 | 模型 Architecture | 论文数据 (Val Mse, Test Mse) | 自己实现(Val Mse, Test Mse)|
 | :--- | :---: | :---: | 
-| **Swin-iFold (Ours)** | (not available,not avaiable) | ( 0.1127,0.1334（30 epoch）) 赢itransformer0.148, 对标 patchtst0.129(80 epoch) |
+| **Swin-iFold (Ours)** | (not available,not avaiable) | ( 0.1127,0.1334（30 epoch）) 赢itransformer0.148, 对标 patchtst paper test mse 0.129(80 epoch) |
 | PatchTST (ICLR 2023) |(not available, 0.1290)    | (around 0.161,0.18667)|
 | iTransformer (ICLR 2024)| (not available, 0.148)  | ( 0.1225, 0.14889)|
 
