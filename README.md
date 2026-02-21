@@ -10,17 +10,6 @@
 Swin-iFold变体在electricity数据集上的Test mse为0.132-0.135，Test Mse 超过itransformer。In addition, itransformer的0.148的test mse是可以复现的。但是patchtst的0.129复现不出来，复现出来只有0.18667，也就是说这个模型应该需要extensive的调优才能达到0.129。
 我的模型简简单单一跑就能达到0.132-0.135，超越itransformer，极其接近patch tst的极限调优结果，说swinifold是Electricity数据集上的sota不为过。
 
-
-| 模型 Architecture | 论文数据 (Val Mse, Test Mse) | 自己实现(Val Mse, Test Mse)|
-| :--- | :---: | :---: | 
-| **Swin-iFold (Ours)** | (not available,not avaiable) | ( 0.1127,0.1334（30 epoch）) 赢itransformer0.148, 对标 patchtst paper test mse 0.129(80 epoch) |
-| PatchTST (ICLR 2023) |(not available, 0.1290)    | (around 0.161,0.18667)|
-| iTransformer (ICLR 2024)| (not available, 0.148)  | ( 0.1225, 0.14889)|
-
-
-🔥 TEST MSE: 0.133400
-📉 Best Val MSE: 0.112703
-
 数据集：Electricity->https://www.kaggle.com/datasets/tylerfarnan/itransformer-datasets
 
 > **结论**: Swin-iFold 以极快的收敛速度和优秀的显存利用率，超越了目前主流的 SOTA 模型，重塑了多变量电力预测的 Baseline。
@@ -40,6 +29,15 @@ Swin-iFold变体在electricity数据集上的Test mse为0.132-0.135，Test Mse �
 ## 🏆 性能评测 (Benchmarks)
 
 在时间序列预测的标准基准测试数据集 **UCL Electricity** 上，Swin-iFold 展现出了压倒性的优势。
+| 模型 Architecture | 论文数据 (Val Mse, Test Mse) | 自己实现(Val Mse, Test Mse)|
+| :--- | :---: | :---: | 
+| **Swin-iFold (Ours)** | (not available,not avaiable) | ( 0.1127,0.1334（30 epoch）) 赢itransformer0.148, 对标 patchtst paper test mse 0.129(80 epoch) |
+| PatchTST (ICLR 2023) |(not available, 0.1290)    | (around 0.161,0.18667)|
+| iTransformer (ICLR 2024)| (not available, 0.148)  | ( 0.1225, 0.14889)|
+
+
+🔥 TEST MSE: 0.133400
+📉 Best Val MSE: 0.112703
 
 * **实验设置**: 预测长度 (Pred Len) = 96，历史窗口 (Seq Len) = 96。
 * **硬件环境**: 4 $\times$ NVIDIA RTX 4090 (Distributed Data Parallel)
