@@ -5,6 +5,8 @@
 ![SOTA](https://img.shields.io/badge/Performance-SOTA-success.svg)
 
 **Swin-iFold** 是一种针对多变量时间序列预测（Multivariate Time Series Forecasting）设计的全新极简架构。它巧妙地结合了计算机视觉中的 **Swin Transformer** 与时序领域的 **iTransformer** 思想，通过“一维折叠（1D-to-2D Folding）”技术，极大地提升了模型对局部周期性和全局变量间依赖的捕捉能力。
+
+## 🚀实际复现，实际跑分 
 Swin-iFold变体在electricity数据集上的Test mse为0.132-0.135，Test Mse 超过itransformer。In addition, itransformer的0.148的test mse是可以复现的。但是patchtst的0.129复现不出来，复现出来只有0.18667，也就是说这个模型应该需要extensive的调优才能达到0.129。
 我的模型简简单单一跑就能达到0.132-0.135，超越itransformer，极其接近patch tst的极限调优结果，说swinifold是Electricity数据集上的sota不为过。
 
