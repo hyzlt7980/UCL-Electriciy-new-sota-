@@ -9,11 +9,11 @@
 ## 🚀实际复现，实际跑分 
 Swin-iFold变体在electricity数据集上L=96,T=96的配置下，Test mse为0.132-0.135，Test Mse 超过itransformer和patch tst。
 说明swinifold是Electricity数据集上的sota。   
-itransformer paper 的Table 10给出了L=96,T=96情况下，在uci electricity数据集的跑分：
+itransformer paper 的Table 10给出了L=96,T=96情况下，主流sota模型在uci electricity数据集的跑分：
+itransformer: 0.148和 patch tst:0.181    
 
-itransformer: 0.148和 patch tst:0.181  
 数据集：Electricity：https://www.kaggle.com/datasets/tylerfarnan/itransformer-datasets    
-**itransformer**:https://arxiv.org/pdf/2310.06625，  见Table 10  
+**itransformer**:https://arxiv.org/pdf/2310.06625   见Table 10  
 > **结论**: Swin-iFold 以极快的收敛速度和优秀的显存利用率，超越了目前主流的 SOTA 模型，重塑了多变量电力预测的 Baseline。
 
 ![Swin-iFold Architecture](./architecture.png) *()*
@@ -31,10 +31,9 @@ itransformer: 0.148和 patch tst:0.181
 在时间序列预测的标准基准测试数据集 **UCL Electricity** 上，Swin-iFold 展现出了压倒性的优势。
 | 模型 Architecture | 论文数据 (Val Mse, Test Mse) | 自己实现(Val Mse, Test Mse)|
 | :--- | :---: | :---: | 
-| **Swin-iFold (Ours)** |  (not available,not avaiable) |  ( 0.1127,0.1334  |
-| PatchTST (ICLR 2023) |   (not available, 0.181)    |     (0.161+-, 0.18667)|
+| **Swin-iFold (Ours)** |  (not available,not avaiable) |  ( 0.1127,0.1334）  |
 | iTransformer (ICLR 2024)| (not available, 0.148)  |      ( 0.1225, 0.14889)|
-
+| PatchTST (ICLR 2023) |   (not available, 0.181)    |     (0.161+-, 0.18667)|
 
 🔥 TEST MSE: 0.133400
 📉 Best Val MSE: 0.112703
