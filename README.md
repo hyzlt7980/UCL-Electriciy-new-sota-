@@ -13,7 +13,7 @@ itransformer paper 的Table 10给出了这个配置下，itransformer和patch ts
 itransformer: 0.148和 patch tst:0.181
 
 数据集：Electricity->https://www.kaggle.com/datasets/tylerfarnan/itransformer-datasets
-itransformer:https://arxiv.org/pdf/2310.06625
+**itransformer**:https://arxiv.org/pdf/2310.06625
 > **结论**: Swin-iFold 以极快的收敛速度和优秀的显存利用率，超越了目前主流的 SOTA 模型，重塑了多变量电力预测的 Baseline。
 
 
@@ -33,9 +33,9 @@ itransformer:https://arxiv.org/pdf/2310.06625
 在时间序列预测的标准基准测试数据集 **UCL Electricity** 上，Swin-iFold 展现出了压倒性的优势。
 | 模型 Architecture | 论文数据 (Val Mse, Test Mse) | 自己实现(Val Mse, Test Mse)|
 | :--- | :---: | :---: | 
-| **Swin-iFold (Ours)** | (not available,not avaiable) | ( 0.1127,0.1334（30 epoch）) 赢itransformer0.148, 对标 patchtst paper test mse 0.129(80 epoch) |
-| PatchTST (ICLR 2023) |(not available, 0.1290)    | (around 0.161,0.18667)|
-| iTransformer (ICLR 2024)| (not available, 0.148)  | ( 0.1225, 0.14889)|
+| **Swin-iFold (Ours)** |  (not available,not avaiable) |  ( 0.1127,0.1334  |
+| PatchTST (ICLR 2023) |   (not available, 0.181)    |     (0.161+-, 0.18667)|
+| iTransformer (ICLR 2024)| (not available, 0.148)  |      ( 0.1225, 0.14889)|
 
 
 🔥 TEST MSE: 0.133400
@@ -48,8 +48,6 @@ itransformer:https://arxiv.org/pdf/2310.06625
 
 
 ## 🛠️ 环境依赖 (Requirements)
-
-```bash
 pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu121](https://download.pytorch.org/whl/cu121)
 pip install pandas numpy matplotlib tqdm scikit-learn
 pip install timm kagglehub
