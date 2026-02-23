@@ -1,13 +1,13 @@
-# 🌊 Swin-iFold: A real new sota on Multivariate Time Series Forecasting
+# 🌊 Swin-sprite: A real new sota on Multivariate Time Series Forecasting
 
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.2%2B-ee4c2c.svg)
 ![SOTA](https://img.shields.io/badge/Performance-SOTA-success.svg)
 
-**Swin-iFold** 是一种针对多变量时间序列预测（Multivariate Time Series Forecasting）设计的全新极简架构。它巧妙地结合了计算机视觉中的 **Swin Transformer** 与时序领域的 **iTransformer** 思想，通过“一维折叠（1D-to-2D Folding）”技术，极大地提升了模型对局部周期性和全局变量间依赖的捕捉能力。
+**Swin-sprite** 是一种针对多变量时间序列预测（Multivariate Time Series Forecasting）设计的全新极简架构。它巧妙地结合了计算机视觉中的 **Swin Transformer** 与时序领域的 **iTransformer** 思想，通过“一维折叠（1D-to-2D Folding）”技术，极大地提升了模型对局部周期性和全局变量间依赖的捕捉能力。
 
 ## 🚀实际复现，实际跑分 
-Swin-iFold变体在electricity数据集上L=96,T=96的配置下，Test mse为0.132-0.135，Test Mse 超过itransformer和patch tst。
+Swin-sprite变体在electricity数据集上L=96,T=96的配置下，Test mse为0.132-0.135，Test Mse 超过itransformer和patch tst。
 说明swinifold是Electricity数据集上的sota。   
 itransformer paper 的Table 10给出了L=96,T=96情况下，主流sota模型在uci electricity数据集的跑分：
 itransformer: 0.148和 patch tst:0.181    
@@ -28,10 +28,10 @@ itransformer: 0.148和 patch tst:0.181
 
 ## 🏆 性能评测 (Benchmarks)
 
-在时间序列预测的标准基准测试数据集 **UCL Electricity** 上，Swin-iFold 展现出了压倒性的优势。
+在时间序列预测的标准基准测试数据集 **UCL Electricity** 上，Swin-sprite 展现出了压倒性的优势。
 | 模型 Architecture | 论文数据 (Val Mse, Test Mse) | 自己实现(Val Mse, Test Mse)|
 | :--- | :---: | :---: | 
-| **Swin-iFold (Ours)** |  (not available,not avaiable) |  ( 0.1127,0.1334）  |
+| **Swin-sprite (Ours)** |  (not available,not avaiable) |  ( 0.1127,0.1334）  |
 | iTransformer (ICLR 2024)| (not available, 0.148)  |      ( 0.1225, 0.14889)|
 | PatchTST (ICLR 2023) |   (not available, 0.181)    |     (0.161+-, 0.18667)|
 
