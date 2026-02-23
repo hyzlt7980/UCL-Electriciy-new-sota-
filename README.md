@@ -7,8 +7,9 @@
 **Swin-sprite** 是一种针对多变量时间序列预测（Multivariate Time Series Forecasting）设计的全新极简架构。它巧妙地结合了计算机视觉中的 **Swin Transformer** 与时序领域的 **iTransformer** 思想，通过“一维折叠（1D-to-2D Folding）”技术，极大地提升了模型对局部周期性和全局变量间依赖的捕捉能力。
 
 ## 🚀实际复现，实际跑分 
-Swin-sprite变体在electricity数据集上L=96,T=96的配置下，Test mse为0.132-0.135，Test Mse 超过itransformer和patch tst。
-说明swinifold是Electricity数据集上的sota。   
+Swin-sprite变体在electricity数据集上L=96,T=96的配置下，Test mse为0.132-0.135，Test Mse 超过itransformer和patch tst
+说明Swin-sprite是Electricity数据集上的sota 
+
 itransformer paper 的Table 10给出了L=96,T=96情况下，主流sota模型在uci electricity数据集的跑分：
 itransformer: 0.148和 patch tst:0.181    
 
@@ -41,7 +42,6 @@ itransformer: 0.148和 patch tst:0.181
 * **实验设置**: 预测长度 (Pred Len) = 96，历史窗口 (Seq Len) = 96。
 * **硬件环境**: 4 $\times$ NVIDIA RTX 4090 (Distributed Data Parallel)
 * **评价指标**: 验证集 MSE (Mean Squared Error)
-
 
 
 ## 🛠️ 环境依赖 (Requirements)
