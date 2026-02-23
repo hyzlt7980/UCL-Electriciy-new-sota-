@@ -12,318 +12,6 @@
       +-------------------+-------------------+-------------------+
 
 
-#这份是目前跑的最好的，之前的0.1171复现不出来了
-(base) root@ubuntu22:~# torchrun --nproc_per_node=4 test.py
-[2026-02-14 19:32:42,785] torch.distributed.run: [WARNING] 
-[2026-02-14 19:32:42,785] torch.distributed.run: [WARNING] *****************************************
-[2026-02-14 19:32:42,785] torch.distributed.run: [WARNING] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
-[2026-02-14 19:32:42,785] torch.distributed.run: [WARNING] *****************************************
-📥 Initializing (Downloading dataset if needed)...
-🚀 Swin-iFold Started | Quiet Mode Active | delta=0.5 | Epochs=20
-✅ Epoch 1/20 | Train Loss: 0.1198 | Val MSE: 0.1831
-✅ Epoch 2/20 | Train Loss: 0.0693 | Val MSE: 0.1632
-✅ Epoch 3/20 | Train Loss: 0.0622 | Val MSE: 0.1419
-✅ Epoch 4/20 | Train Loss: 0.0585 | Val MSE: 0.1337
-✅ Epoch 5/20 | Train Loss: 0.0565 | Val MSE: 0.1292
-✅ Epoch 6/20 | Train Loss: 0.0546 | Val MSE: 0.1284
-✅ Epoch 7/20 | Train Loss: 0.0535 | Val MSE: 0.1249
-✅ Epoch 8/20 | Train Loss: 0.0521 | Val MSE: 0.1230
-✅ Epoch 9/20 | Train Loss: 0.0510 | Val MSE: 0.1222
-✅ Epoch 10/20 | Train Loss: 0.0502 | Val MSE: 0.1234
-✅ Epoch 11/20 | Train Loss: 0.0489 | Val MSE: 0.1218
-✅ Epoch 12/20 | Train Loss: 0.0484 | Val MSE: 0.1221
-✅ Epoch 13/20 | Train Loss: 0.0474 | Val MSE: 0.1196
-✅ Epoch 14/20 | Train Loss: 0.0469 | Val MSE: 0.1205
-✅ Epoch 15/20 | Train Loss: 0.0463 | Val MSE: 0.1200
-✅ Epoch 16/20 | Train Loss: 0.0456 | Val MSE: 0.1179  ####Best MSE: swinifold:0.1179,  patchTST 0.129(paper),  itransformer:0.148(paper)
-✅ Epoch 17/20 | Train Loss: 0.0451 | Val MSE: 0.1184
-✅ Epoch 18/20 | Train Loss: 0.0450 | Val MSE: 0.1183
-✅ Epoch 19/20 | Train Loss: 0.0448 | Val MSE: 0.1185
-✅ Epoch 20/20 | Train Loss: 0.0447 | Val MSE: 0.1183
-
-
-
-#30 epoch
-(base) root@ubuntu22:~# torchrun --nproc_per_node=4 test.py
-[2026-02-14 19:51:43,690] torch.distributed.run: [WARNING] 
-[2026-02-14 19:51:43,690] torch.distributed.run: [WARNING] *****************************************
-[2026-02-14 19:51:43,690] torch.distributed.run: [WARNING] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
-[2026-02-14 19:51:43,690] torch.distributed.run: [WARNING] *****************************************
-📥 Initializing (Downloading dataset if needed)...
-🚀 Swin-iFold Started | Quiet Mode Active | Default Huber | Epochs=30
-✅ Epoch 1/30 | Train Loss: 0.1588 | Val MSE: 0.1917
-✅ Epoch 2/30 | Train Loss: 0.0887 | Val MSE: 0.1645
-✅ Epoch 3/30 | Train Loss: 0.0774 | Val MSE: 0.1441
-✅ Epoch 4/30 | Train Loss: 0.0724 | Val MSE: 0.1341
-✅ Epoch 5/30 | Train Loss: 0.0698 | Val MSE: 0.1309
-✅ Epoch 6/30 | Train Loss: 0.0673 | Val MSE: 0.1300
-✅ Epoch 7/30 | Train Loss: 0.0661 | Val MSE: 0.1279
-✅ Epoch 8/30 | Train Loss: 0.0642 | Val MSE: 0.1266
-✅ Epoch 9/30 | Train Loss: 0.0625 | Val MSE: 0.1245
-✅ Epoch 10/30 | Train Loss: 0.0615 | Val MSE: 0.1249
-✅ Epoch 11/30 | Train Loss: 0.0598 | Val MSE: 0.1244
-✅ Epoch 12/30 | Train Loss: 0.0591 | Val MSE: 0.1223
-✅ Epoch 13/30 | Train Loss: 0.0577 | Val MSE: 0.1222
-✅ Epoch 14/30 | Train Loss: 0.0570 | Val MSE: 0.1235
-✅ Epoch 15/30 | Train Loss: 0.0561 | Val MSE: 0.1214
-✅ Epoch 16/30 | Train Loss: 0.0551 | Val MSE: 0.1204
-✅ Epoch 17/30 | Train Loss: 0.0542 | Val MSE: 0.1206
-✅ Epoch 18/30 | Train Loss: 0.0539 | Val MSE: 0.1207
-✅ Epoch 19/30 | Train Loss: 0.0531 | Val MSE: 0.1194
-✅ Epoch 20/30 | Train Loss: 0.0528 | Val MSE: 0.1197
-✅ Epoch 21/30 | Train Loss: 0.0520 | Val MSE: 0.1198
-✅ Epoch 22/30 | Train Loss: 0.0517 | Val MSE: 0.1204
-✅ Epoch 23/30 | Train Loss: 0.0513 | Val MSE: 0.1190
-✅ Epoch 24/30 | Train Loss: 0.0508 | Val MSE: 0.1190
-✅ Epoch 25/30 | Train Loss: 0.0505 | Val MSE: 0.1194
-✅ Epoch 26/30 | Train Loss: 0.0505 | Val MSE: 0.1187
-✅ Epoch 27/30 | Train Loss: 0.0504 | Val MSE: 0.1193
-✅ Epoch 28/30 | Train Loss: 0.0500 | Val MSE: 0.1192
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--------------------------------------------下边的代码是神级代码，跑进0.115，log在代码下方
-import os, math, random, time, glob, torch, kagglehub
-import numpy as np
-import pandas as pd
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data.distributed import DistributedSampler
-from torch.utils.data import Dataset, DataLoader
-from torch.amp import autocast
-from sklearn.preprocessing import StandardScaler
-from timm.models.swin_transformer import SwinTransformerBlock
-
-# ==========================================
-# 0. 环境加速配置
-# ==========================================
-torch.backends.cuda.matmul.allow_tf32 = True
-torch.backends.cudnn.allow_tf32 = True
-torch.backends.cudnn.benchmark = True
-
-# ==========================================
-# 1. RevIN (完全保留你的仿射变换实现)
-# ==========================================
-class RevIN(nn.Module):
-    def __init__(self, num_features: int, eps=1e-5, affine=True):
-        super(RevIN, self).__init__()
-        self.num_features = num_features
-        self.eps = eps
-        self.affine = affine
-        if self.affine:
-            self.affine_weight = nn.Parameter(torch.ones(self.num_features))
-            self.affine_bias = nn.Parameter(torch.zeros(self.num_features))
-
-    def forward(self, x, mode:str):
-        if mode == 'norm':
-            dim2reduce = tuple(range(len(x.shape)-1))
-            self.mean = torch.mean(x, dim=dim2reduce, keepdim=True).detach()
-            self.stdev = torch.sqrt(torch.var(x, dim=dim2reduce, keepdim=True, unbiased=False) + self.eps).detach()
-            x = (x - self.mean) / self.stdev
-            if self.affine: x = x * self.affine_weight + self.affine_bias
-        elif mode == 'denorm':
-            if self.affine:
-                x = (x - self.affine_bias) / (self.affine_weight + self.eps * self.affine_weight)
-            x = x * self.stdev + self.mean
-        return x
-
-# ==========================================
-# 2. 层次化组件 (Digit Generator)
-# ==========================================
-class BoxDownsample(nn.Module):
-    def __init__(self, in_dim, out_dim):
-        super().__init__()
-        self.reduction = nn.Conv2d(in_dim, out_dim, kernel_size=2, stride=2)
-        self.norm = nn.LayerNorm(out_dim)
-
-    def forward(self, x, H, W):
-        B_N = x.shape[0]
-        x = x.permute(0, 3, 1, 2) # [B*N, C, H, W]
-        x = self.reduction(x)     # [B*N, out_C, 4, 6]
-        H_new, W_new = x.shape[2], x.shape[3]
-        x = x.flatten(2).transpose(1, 2) 
-        return self.norm(x).view(B_N, H_new, W_new, -1), H_new, W_new
-
-# ==========================================
-# 3. 层次化 Swin-iFold 架构
-# ==========================================
-class Swin_iFold_Hierarchical(nn.Module):
-    def __init__(self, num_vars=321, embed_dim=128, depth=2):
-        super().__init__()
-        self.H, self.W = 8, 12 
-        self.revin = RevIN(num_vars)
-        self.patch_embed = nn.Linear(1, embed_dim)
-        
-        # Stage 1: 8x12 分辨率
-        self.swin_stage1 = nn.ModuleList([
-            SwinTransformerBlock(dim=embed_dim, input_resolution=(8, 12), num_heads=8, window_size=4,
-                                 shift_size=0 if (i % 2 == 0) else 2) for i in range(depth)
-        ])
-        
-        self.downsample = BoxDownsample(embed_dim, embed_dim * 2)
-        
-        # Stage 2: 4x6 指纹分辨率
-        self.swin_stage2 = nn.ModuleList([
-            SwinTransformerBlock(dim=embed_dim * 2, input_resolution=(4, 6), num_heads=8, window_size=2,
-                                 shift_size=0 if (i % 2 == 0) else 1) for i in range(depth)
-        ])
-        
-        self.variable_attention = nn.TransformerEncoderLayer(d_model=embed_dim * 2, nhead=8, 
-                                                             dim_feedforward=embed_dim * 8, batch_first=True, norm_first=True)
-        self.head = nn.Linear(embed_dim * 2, 96)
-
-    def forward(self, x):
-        B, L, N = x.shape
-        x = self.revin(x, 'norm')
-        x = x.permute(0, 2, 1).reshape(B * N, L, 1)
-        x = self.patch_embed(x).view(B * N, self.H, self.W, -1)
-        
-        for blk in self.swin_stage1: x = blk(x)
-        x, H2, W2 = self.downsample(x, self.H, self.W)
-        for blk in self.swin_stage2: x = blk(x)
-        
-        feat = x.mean(dim=(1, 2)).view(B, N, -1)
-        feat = self.variable_attention(feat)
-        out = self.head(feat).permute(0, 2, 1)
-        return self.revin(out, 'denorm')
-
-# ==========================================
-# 4. 数据集逻辑 (完全保留你的 Border 划分)
-# ==========================================
-class ElectricityDataset(Dataset):
-    def __init__(self, csv_path, flag='train'):
-        df_raw = pd.read_csv(csv_path).iloc[:, 1:]
-        n = len(df_raw); tr = int(n*0.7); te = int(n*0.2); val = n - tr - te
-        border1s = [0, tr - 96, n - te - 96]
-        border2s = [tr, tr + val, n]
-        f_idx = {'train': 0, 'val': 1, 'test': 2}[flag]
-        b1, b2 = border1s[f_idx], border2s[f_idx]
-        self.scaler = StandardScaler()
-        self.scaler.fit(df_raw.iloc[border1s[0]:border2s[0]].values)
-        self.data = self.scaler.transform(df_raw.values)[b1:b2]
-
-    def __getitem__(self, i):
-        return torch.tensor(self.data[i:i+96], dtype=torch.float32), torch.tensor(self.data[i+96:i+192], dtype=torch.float32)
-
-    def __len__(self): return len(self.data) - 191
-
-# ==========================================
-# 5. 主训练循环 (静默输出版)
-# ==========================================
-def main():
-    local_rank = int(os.environ.get("LOCAL_RANK", 0))
-    dist.init_process_group("nccl"); torch.cuda.set_device(local_rank)
-    
-    if local_rank == 0:
-        p = kagglehub.dataset_download("tylerfarnan/itransformer-datasets")
-        with open(".ds_p.tmp", "w") as f: f.write(p)
-    dist.barrier()
-    with open(".ds_p.tmp", "r") as f: 
-        csv_p = glob.glob(os.path.join(f.read().strip(), "**", "electricity.csv"), recursive=True)[0]
-
-    train_ds = ElectricityDataset(csv_p, 'train'); val_ds = ElectricityDataset(csv_p, 'val')
-    train_loader = DataLoader(train_ds, batch_size=8//dist.get_world_size(), sampler=DistributedSampler(train_ds))
-    val_loader = DataLoader(val_ds, batch_size=8//dist.get_world_size(), sampler=DistributedSampler(val_ds, shuffle=False))
-
-    model = Swin_iFold_Hierarchical(num_vars=321, embed_dim=128).to(local_rank)
-    model = DDP(model, device_ids=[local_rank])
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-5)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=30)
-    criterion = nn.HuberLoss() # 保持你的 HuberLoss 配置
-
-    if local_rank == 0:
-        print(f"🚀 Swin-iFold Hier-V5 启动 | 4卡并行模式 | 目标记录 0.1176")
-
-    for epoch in range(30):
-        train_loader.sampler.set_epoch(epoch)
-        model.train()
-        epoch_loss = 0
-        
-        for bx, by in train_loader:
-            bx, by = bx.to(local_rank), by.to(local_rank)
-            optimizer.zero_grad(set_to_none=True)
-            with autocast(device_type='cuda', dtype=torch.bfloat16):
-                loss = criterion(model(bx), by)
-            loss.backward()
-            optimizer.step()
-            epoch_loss += loss.item()
-        
-        scheduler.step()
-        dist.barrier()
-        
-        if local_rank == 0:
-            model.eval()
-            v_mse = 0
-            with torch.no_grad():
-                for vbx, vby in val_loader:
-                    v_mse += F.mse_loss(model(vbx.to(local_rank)), vby.to(local_rank)).item()
-            avg_loss = epoch_loss / len(train_loader)
-            avg_mse = v_mse / len(val_loader)
-            print(f"E{epoch+1:02d} | Train Loss: {avg_loss:.4f} | Val MSE: {avg_mse:.6f} | LR: {optimizer.param_groups[0]['lr']:.6f}")
-            torch.save(model.module.state_dict(), "swin_hier_best.pth")
-
-if __name__ == "__main__": main()
-
-
-(base) root@ubuntu22:~# OMP_NUM_THREADS=1 torchrun --nproc_per_node=4 --master_port=29501 test.py
-🚀 Swin-iFold Hier-V5 启动 | 4卡并行模式 | 目标记录 0.1176
-E01 | Train Loss: 0.0980 | Val MSE: 0.145173 | LR: 0.000997
-E02 | Train Loss: 0.0724 | Val MSE: 0.141391 | LR: 0.000989
-E03 | Train Loss: 0.0674 | Val MSE: 0.128422 | LR: 0.000976
-cE04 | Train Loss: 0.0651 | Val MSE: 0.124317 | LR: 0.000957
-E05 | Train Loss: 0.0639 | Val MSE: 0.122289 | LR: 0.000933
-E06 | Train Loss: 0.0620 | Val MSE: 0.123123 | LR: 0.000905
-E07 | Train Loss: 0.0607 | Val MSE: 0.120685 | LR: 0.000872
-E08 | Train Loss: 0.0586 | Val MSE: 0.119430 | LR: 0.000835
-E09 | Train Loss: 0.0570 | Val MSE: 0.118504 | LR: 0.000794
-E10 | Train Loss: 0.0556 | Val MSE: 0.119562 | LR: 0.000750
-E11 | Train Loss: 0.0541 | Val MSE: 0.119140 | LR: 0.000703
-E12 | Train Loss: 0.0532 | Val MSE: 0.117039 | LR: 0.000655
-E13 | Train Loss: 0.0521 | Val MSE: 0.116496 | LR: 0.000604
-E14 | Train Loss: 0.0512 | Val MSE: 0.115512 | LR: 0.000552 #Best Val MSE
-E15 | Train Loss: 0.0504 | Val MSE: 0.117546 | LR: 0.000500
-E16 | Train Loss: 0.0494 | Val MSE: 0.116832 | LR: 0.000448
-E17 | Train Loss: 0.0485 | Val MSE: 0.117217 | LR: 0.000396
-E18 | Train Loss: 0.0480 | Val MSE: 0.115856 | LR: 0.000345
-E19 | Train Loss: 0.0473 | Val MSE: 0.115713 | LR: 0.000297 
-E20 | Train Loss: 0.0469 | Val MSE: 0.118639 | LR: 0.000250
-E21 | Train Loss: 0.0462 | Val MSE: 0.116819 | LR: 0.000206
-E22 | Train Loss: 0.0459 | Val MSE: 0.117353 | LR: 0.000165
-E23 | Train Loss: 0.0455 | Val MSE: 0.118167 | LR: 0.000128
-E24 | Train Loss: 0.0450 | Val MSE: 0.117471 | LR: 0.000095
-E25 | Train Loss: 0.0448 | Val MSE: 0.117206 | LR: 0.000067
-E26 | Train Loss: 0.0447 | Val MSE: 0.117043 | LR: 0.000043
-E27 | Train Loss: 0.0446 | Val MSE: 0.117005 | LR: 0.000024
-E28 | Train Loss: 0.0443 | Val MSE: 0.117305 | LR: 0.000011
-E29 | Train Loss: 0.0442 | Val MSE: 0.117253 | LR: 0.000003
-E30 | Train Loss: 0.0443 | Val MSE: 0.117481 | LR: 0.000000
-
-
 
 #带噪声去噪的swinifold,
 import os, math, random, time, glob, torch, kagglehub
@@ -579,14 +267,6 @@ E29 | Train: 0.0433 | Val MSE: 0.113542
 E30 | Train: 0.0433 | Val MSE: 0.113569
 
 
-
-
-
-
-
-
-
-
 ##测试集结果
 import os, math, random, time, glob, torch
 import numpy as np
@@ -761,13 +441,6 @@ if __name__ == "__main__":
 
 
 
-
-
-
-
-
-
-
 ==================================================================================================================================================================================
 base) root@ubuntu22:~# torchrun --nproc_per_node=4 swinifold.py
 W0218 02:24:19.105000 6481 site-packages/torch/distributed/run.py:793] 
@@ -821,8 +494,6 @@ E30 | Time: 61.4s | T-Loss: 0.0412 | DAE-Loss: 0.09098 | Val MSE: 0.112703 🌟 
 ============================================================
 🏆 训练结束！加载最佳权重 [best_v6_dae_true.pth] 进行终测...
 ============================================================
-
-
 ============================================================
 🏆 训练结束！加载最佳权重 [best_v6_dae_true.pth] 进行终测...
 ============================================================
@@ -838,6 +509,12 @@ E30 | Time: 61.4s | T-Loss: 0.0412 | DAE-Loss: 0.09098 | Val MSE: 0.112703 🌟 
 📊 【最终双重防御开奖】
 🔥 TEST MSE: 0.133400
 📉 Best Val MSE: 0.112703
+
+
+
+
+
+
 
 
 # ======================================================================
@@ -1126,6 +803,228 @@ if __name__ == "__main__": main()
 
 
 
+
+
+
+
+
+-------------------------------------------下边的代码是神级代码，跑进0.115，log在代码下方
+import os, math, random, time, glob, torch, kagglehub
+import numpy as np
+import pandas as pd
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import Dataset, DataLoader
+from torch.amp import autocast
+from sklearn.preprocessing import StandardScaler
+from timm.models.swin_transformer import SwinTransformerBlock
+
+# ==========================================
+# 0. 环境加速配置
+# ==========================================
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+torch.backends.cudnn.benchmark = True
+
+# ==========================================
+# 1. RevIN (完全保留你的仿射变换实现)
+# ==========================================
+class RevIN(nn.Module):
+    def __init__(self, num_features: int, eps=1e-5, affine=True):
+        super(RevIN, self).__init__()
+        self.num_features = num_features
+        self.eps = eps
+        self.affine = affine
+        if self.affine:
+            self.affine_weight = nn.Parameter(torch.ones(self.num_features))
+            self.affine_bias = nn.Parameter(torch.zeros(self.num_features))
+
+    def forward(self, x, mode:str):
+        if mode == 'norm':
+            dim2reduce = tuple(range(len(x.shape)-1))
+            self.mean = torch.mean(x, dim=dim2reduce, keepdim=True).detach()
+            self.stdev = torch.sqrt(torch.var(x, dim=dim2reduce, keepdim=True, unbiased=False) + self.eps).detach()
+            x = (x - self.mean) / self.stdev
+            if self.affine: x = x * self.affine_weight + self.affine_bias
+        elif mode == 'denorm':
+            if self.affine:
+                x = (x - self.affine_bias) / (self.affine_weight + self.eps * self.affine_weight)
+            x = x * self.stdev + self.mean
+        return x
+
+# ==========================================
+# 2. 层次化组件 (Digit Generator)
+# ==========================================
+class BoxDownsample(nn.Module):
+    def __init__(self, in_dim, out_dim):
+        super().__init__()
+        self.reduction = nn.Conv2d(in_dim, out_dim, kernel_size=2, stride=2)
+        self.norm = nn.LayerNorm(out_dim)
+
+    def forward(self, x, H, W):
+        B_N = x.shape[0]
+        x = x.permute(0, 3, 1, 2) # [B*N, C, H, W]
+        x = self.reduction(x)     # [B*N, out_C, 4, 6]
+        H_new, W_new = x.shape[2], x.shape[3]
+        x = x.flatten(2).transpose(1, 2) 
+        return self.norm(x).view(B_N, H_new, W_new, -1), H_new, W_new
+
+# ==========================================
+# 3. 层次化 Swin-iFold 架构
+# ==========================================
+class Swin_iFold_Hierarchical(nn.Module):
+    def __init__(self, num_vars=321, embed_dim=128, depth=2):
+        super().__init__()
+        self.H, self.W = 8, 12 
+        self.revin = RevIN(num_vars)
+        self.patch_embed = nn.Linear(1, embed_dim)
+        
+        # Stage 1: 8x12 分辨率
+        self.swin_stage1 = nn.ModuleList([
+            SwinTransformerBlock(dim=embed_dim, input_resolution=(8, 12), num_heads=8, window_size=4,
+                                 shift_size=0 if (i % 2 == 0) else 2) for i in range(depth)
+        ])
+        
+        self.downsample = BoxDownsample(embed_dim, embed_dim * 2)
+        
+        # Stage 2: 4x6 指纹分辨率
+        self.swin_stage2 = nn.ModuleList([
+            SwinTransformerBlock(dim=embed_dim * 2, input_resolution=(4, 6), num_heads=8, window_size=2,
+                                 shift_size=0 if (i % 2 == 0) else 1) for i in range(depth)
+        ])
+        
+        self.variable_attention = nn.TransformerEncoderLayer(d_model=embed_dim * 2, nhead=8, 
+                                                             dim_feedforward=embed_dim * 8, batch_first=True, norm_first=True)
+        self.head = nn.Linear(embed_dim * 2, 96)
+
+    def forward(self, x):
+        B, L, N = x.shape
+        x = self.revin(x, 'norm')
+        x = x.permute(0, 2, 1).reshape(B * N, L, 1)
+        x = self.patch_embed(x).view(B * N, self.H, self.W, -1)
+        
+        for blk in self.swin_stage1: x = blk(x)
+        x, H2, W2 = self.downsample(x, self.H, self.W)
+        for blk in self.swin_stage2: x = blk(x)
+        
+        feat = x.mean(dim=(1, 2)).view(B, N, -1)
+        feat = self.variable_attention(feat)
+        out = self.head(feat).permute(0, 2, 1)
+        return self.revin(out, 'denorm')
+
+# ==========================================
+# 4. 数据集逻辑 (完全保留你的 Border 划分)
+# ==========================================
+class ElectricityDataset(Dataset):
+    def __init__(self, csv_path, flag='train'):
+        df_raw = pd.read_csv(csv_path).iloc[:, 1:]
+        n = len(df_raw); tr = int(n*0.7); te = int(n*0.2); val = n - tr - te
+        border1s = [0, tr - 96, n - te - 96]
+        border2s = [tr, tr + val, n]
+        f_idx = {'train': 0, 'val': 1, 'test': 2}[flag]
+        b1, b2 = border1s[f_idx], border2s[f_idx]
+        self.scaler = StandardScaler()
+        self.scaler.fit(df_raw.iloc[border1s[0]:border2s[0]].values)
+        self.data = self.scaler.transform(df_raw.values)[b1:b2]
+
+    def __getitem__(self, i):
+        return torch.tensor(self.data[i:i+96], dtype=torch.float32), torch.tensor(self.data[i+96:i+192], dtype=torch.float32)
+
+    def __len__(self): return len(self.data) - 191
+
+# ==========================================
+# 5. 主训练循环 (静默输出版)
+# ==========================================
+def main():
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    dist.init_process_group("nccl"); torch.cuda.set_device(local_rank)
+    
+    if local_rank == 0:
+        p = kagglehub.dataset_download("tylerfarnan/itransformer-datasets")
+        with open(".ds_p.tmp", "w") as f: f.write(p)
+    dist.barrier()
+    with open(".ds_p.tmp", "r") as f: 
+        csv_p = glob.glob(os.path.join(f.read().strip(), "**", "electricity.csv"), recursive=True)[0]
+
+    train_ds = ElectricityDataset(csv_p, 'train'); val_ds = ElectricityDataset(csv_p, 'val')
+    train_loader = DataLoader(train_ds, batch_size=8//dist.get_world_size(), sampler=DistributedSampler(train_ds))
+    val_loader = DataLoader(val_ds, batch_size=8//dist.get_world_size(), sampler=DistributedSampler(val_ds, shuffle=False))
+
+    model = Swin_iFold_Hierarchical(num_vars=321, embed_dim=128).to(local_rank)
+    model = DDP(model, device_ids=[local_rank])
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-5)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=30)
+    criterion = nn.HuberLoss() # 保持你的 HuberLoss 配置
+
+    if local_rank == 0:
+        print(f"🚀 Swin-iFold Hier-V5 启动 | 4卡并行模式 | 目标记录 0.1176")
+
+    for epoch in range(30):
+        train_loader.sampler.set_epoch(epoch)
+        model.train()
+        epoch_loss = 0
+        
+        for bx, by in train_loader:
+            bx, by = bx.to(local_rank), by.to(local_rank)
+            optimizer.zero_grad(set_to_none=True)
+            with autocast(device_type='cuda', dtype=torch.bfloat16):
+                loss = criterion(model(bx), by)
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+        
+        scheduler.step()
+        dist.barrier()
+        
+        if local_rank == 0:
+            model.eval()
+            v_mse = 0
+            with torch.no_grad():
+                for vbx, vby in val_loader:
+                    v_mse += F.mse_loss(model(vbx.to(local_rank)), vby.to(local_rank)).item()
+            avg_loss = epoch_loss / len(train_loader)
+            avg_mse = v_mse / len(val_loader)
+            print(f"E{epoch+1:02d} | Train Loss: {avg_loss:.4f} | Val MSE: {avg_mse:.6f} | LR: {optimizer.param_groups[0]['lr']:.6f}")
+            torch.save(model.module.state_dict(), "swin_hier_best.pth")
+
+if __name__ == "__main__": main()
+
+
+(base) root@ubuntu22:~# OMP_NUM_THREADS=1 torchrun --nproc_per_node=4 --master_port=29501 test.py
+🚀 Swin-iFold Hier-V5 启动 | 4卡并行模式 | 目标记录 0.1176
+E01 | Train Loss: 0.0980 | Val MSE: 0.145173 | LR: 0.000997
+E02 | Train Loss: 0.0724 | Val MSE: 0.141391 | LR: 0.000989
+E03 | Train Loss: 0.0674 | Val MSE: 0.128422 | LR: 0.000976
+cE04 | Train Loss: 0.0651 | Val MSE: 0.124317 | LR: 0.000957
+E05 | Train Loss: 0.0639 | Val MSE: 0.122289 | LR: 0.000933
+E06 | Train Loss: 0.0620 | Val MSE: 0.123123 | LR: 0.000905
+E07 | Train Loss: 0.0607 | Val MSE: 0.120685 | LR: 0.000872
+E08 | Train Loss: 0.0586 | Val MSE: 0.119430 | LR: 0.000835
+E09 | Train Loss: 0.0570 | Val MSE: 0.118504 | LR: 0.000794
+E10 | Train Loss: 0.0556 | Val MSE: 0.119562 | LR: 0.000750
+E11 | Train Loss: 0.0541 | Val MSE: 0.119140 | LR: 0.000703
+E12 | Train Loss: 0.0532 | Val MSE: 0.117039 | LR: 0.000655
+E13 | Train Loss: 0.0521 | Val MSE: 0.116496 | LR: 0.000604
+E14 | Train Loss: 0.0512 | Val MSE: 0.115512 | LR: 0.000552 #Best Val MSE
+E15 | Train Loss: 0.0504 | Val MSE: 0.117546 | LR: 0.000500
+E16 | Train Loss: 0.0494 | Val MSE: 0.116832 | LR: 0.000448
+E17 | Train Loss: 0.0485 | Val MSE: 0.117217 | LR: 0.000396
+E18 | Train Loss: 0.0480 | Val MSE: 0.115856 | LR: 0.000345
+E19 | Train Loss: 0.0473 | Val MSE: 0.115713 | LR: 0.000297 
+E20 | Train Loss: 0.0469 | Val MSE: 0.118639 | LR: 0.000250
+E21 | Train Loss: 0.0462 | Val MSE: 0.116819 | LR: 0.000206
+E22 | Train Loss: 0.0459 | Val MSE: 0.117353 | LR: 0.000165
+E23 | Train Loss: 0.0455 | Val MSE: 0.118167 | LR: 0.000128
+E24 | Train Loss: 0.0450 | Val MSE: 0.117471 | LR: 0.000095
+E25 | Train Loss: 0.0448 | Val MSE: 0.117206 | LR: 0.000067
+E26 | Train Loss: 0.0447 | Val MSE: 0.117043 | LR: 0.000043
+E27 | Train Loss: 0.0446 | Val MSE: 0.117005 | LR: 0.000024
+E28 | Train Loss: 0.0443 | Val MSE: 0.117305 | LR: 0.000011
+E29 | Train Loss: 0.0442 | Val MSE: 0.117253 | LR: 0.000003
+E30 | Train Loss: 0.0443 | Val MSE: 0.117481 | LR: 0.000000
 
 
 
