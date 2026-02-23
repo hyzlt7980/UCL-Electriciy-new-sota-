@@ -1,8 +1,7 @@
 patch-tst 官方库版本的log: 可以看到在下边的patch长度16，步长为8的情况下，Test MSE: 0.18667
 
 下边是gemini对Log的解读，我确认无误。
-Test mse仅为0.18667，patch tst在这个参数情况下表现非常不好，距离原本paper里的0.129相差很大。
-调优：当前一个epoch需要接近1分钟，复现到0.129难度非常高。我下边缩小了path
+Test mse仅为0.18667，patch tst在这个参数情况下表现非常不好，距离原本paper里的0.129相差很大。####后边我发现0.129是Look_back_window=336的情况下，patch tst跑出来的，Look_back_window=96的情况下，patch tst的官方是0.181
 
 
 这是触发了早停机制 (Early Stopping)。
@@ -53,8 +52,9 @@ mse:0.18666857481002808, mae:0.292790949344635, dtw:Not calculated
 “帧率”翻倍：同样是 96 长度的时间序列，16/8 只能切出约 12 个 Token，而 12/4 可以切出约 23 个 Token。
 我们喂给 Transformer 的细节多了一倍。这正是配合 --d_model 256 去挑战 Swinifold 0.134 极限记录的核心战术。
 
+
 log解读：
-这次一个epoch的时间到了90s左右，时间太长了，对比itransformer和我的swinifold，训练时间太久了。
+这次一个epoch的时间到了90s左右，时间太长了，对比itransformer和swin-sprite，训练时间太久了。
 epoch 5的test mse: 0.2051378
 epoch 22的test mse:0.1890295
 可以情况会比patch长度16的好一点，但是100epoch test mse能到0.129吗？这个训练太麻烦了，一个epoch要90s，我们先停下。
