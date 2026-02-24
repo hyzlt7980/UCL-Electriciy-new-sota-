@@ -18,7 +18,7 @@ itransformer: 0.148和 patch tst:0.181
 > **结论**: Swin-iFold 以极快的收敛速度和优秀的显存利用率，超越了目前主流的 SOTA 模型，重塑了多变量电力预测的 Baseline。
 
 ![Swin-iFold Architecture](./architecture.png) *()*
-![Swin-iFold Architecture-hand drawing](./swinifold.png) *()*
+![Swin-iFold Architecture-hand drawing](./swin-sprite.png) *()*
 ![swin-shift-window-attention](./swin-shift-window-attention.png) *()* 
 
 ## 🚀 核心创新 (Key Innovations)
