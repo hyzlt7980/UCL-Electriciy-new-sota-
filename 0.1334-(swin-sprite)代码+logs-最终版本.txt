@@ -373,6 +373,1093 @@ E30 | Time: 81.8s | T-Loss: 0.0408 | DAE-Loss: 0.10704 | Val MSE: 0.112917 | Val
 
 
 
+# ======================================================================
+# Swin-iFold V6 [4卡 A8000 安全版]
+# 保留：
+# 1. RevIN 安全修复（样本独立 + 变量独立 + 时间维归一化）
+# 2. val/test rank0 单卡评估
+# 3. 单卡 / 多卡兼容
+# 4. 4 卡 A8000 使用 FP16 + GradScaler
+#
+# 回滚：
+# 5. 混合噪声中的 pulse noise 改回原版：全 batch x.max() / x.min()
+# ======================================================================
+
+import os
+import time
+import glob
+import random
+import numpy as np
+import pandas as pd
+import kagglehub
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.distributed as dist
+
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.distributed import DistributedSampler
+from sklearn.preprocessing import StandardScaler
+from timm.models.swin_transformer import SwinTransformerBlock
+from timm.layers import Mlp
+
+try:
+    from torch.amp import autocast, GradScaler
+except ImportError:
+    from torch.cuda.amp import autocast, GradScaler
+
+
+# ==========================================
+# 0. 配置
+# ==========================================
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.allow_tf32 = False
+torch.backends.cudnn.benchmark = True
+
+
+def seed_everything(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+
+# ==========================================
+# 1. RevIN（安全修复版）
+# 输入: [B, L, N]
+# ==========================================
+class RevIN(nn.Module):
+    def __init__(self, num_features: int, eps=1e-5, affine=True):
+        super().__init__()
+        self.num_features = num_features
+        self.eps = eps
+        self.affine = affine
+
+        if affine:
+            self.affine_weight = nn.Parameter(torch.ones(1, 1, num_features))
+            self.affine_bias = nn.Parameter(torch.zeros(1, 1, num_features))
+
+    def forward(self, x, mode: str):
+        if mode == 'norm':
+            mean = x.mean(dim=1, keepdim=True).detach()   # [B,1,N]
+            stdev = torch.sqrt(x.var(dim=1, keepdim=True, unbiased=False) + self.eps).detach()
+
+            x = (x - mean) / stdev
+            if self.affine:
+                x = x * self.affine_weight + self.affine_bias
+
+            self._cached_mean = mean
+            self._cached_stdev = stdev
+            return x
+
+        elif mode == 'denorm':
+            if not hasattr(self, "_cached_mean") or not hasattr(self, "_cached_stdev"):
+                raise RuntimeError("RevIN denorm called before norm in the same forward pass.")
+
+            if self.affine:
+                x = (x - self.affine_bias) / (self.affine_weight + self.eps)
+
+            x = x * self._cached_stdev + self._cached_mean
+            return x
+
+        else:
+            raise ValueError(f"Unsupported RevIN mode: {mode}")
+
+
+# ==========================================
+# 2. DAE
+# ==========================================
+class DenoisingDisruptionBlock(nn.Module):
+    def __init__(self, dim, num_heads=8):
+        super().__init__()
+        self.norm1 = nn.LayerNorm(dim)
+        self.attn = nn.MultiheadAttention(dim, num_heads, batch_first=True)
+        self.norm2 = nn.LayerNorm(dim)
+        self.mlp = Mlp(in_features=dim, hidden_features=dim * 4, out_features=dim)
+        self.denoise_loss_fn = nn.MSELoss()
+        self.denoise_proj = nn.Linear(dim, dim)
+
+    def forward(self, x_noisy, x_clean_target=None):
+        attn_out, _ = self.attn(
+            self.norm1(x_noisy),
+            self.norm1(x_noisy),
+            self.norm1(x_noisy)
+        )
+        x_p = x_noisy + attn_out
+        x_p = x_p + self.mlp(self.norm2(x_p))
+
+        if self.training and x_clean_target is not None:
+            d_loss = self.denoise_loss_fn(
+                self.denoise_proj(x_p),
+                x_clean_target.detach()
+            )
+            return x_p, d_loss
+
+        return x_p, torch.tensor(0.0, device=x_noisy.device)
+
+
+# ==========================================
+# 3. 主模型
+# ==========================================
+class Swin_iFold_V6(nn.Module):
+    def __init__(self, num_vars=321, embed_dim=128, noise_level=0.025):
+        super().__init__()
+        self.H, self.W = 8, 12
+        self.revin = RevIN(num_vars)
+        self.patch_embed = nn.Linear(1, embed_dim)
+        self.noise_level = noise_level
+
+        self.l1_swin1 = SwinTransformerBlock(
+            dim=embed_dim,
+            input_resolution=(8, 12),
+            num_heads=8,
+            window_size=4,
+            shift_size=0,
+            proj_drop=0.025,
+            attn_drop=0.025
+        )
+        self.l1_swin2 = SwinTransformerBlock(
+            dim=embed_dim,
+            input_resolution=(8, 12),
+            num_heads=8,
+            window_size=4,
+            shift_size=2,
+            proj_drop=0.025,
+            attn_drop=0.025
+        )
+
+        self.dae_block = DenoisingDisruptionBlock(embed_dim, num_heads=8)
+
+        self.reduction = nn.Conv2d(embed_dim, embed_dim * 2, kernel_size=2, stride=2)
+        self.norm = nn.LayerNorm(embed_dim * 2)
+
+        self.l2_swins = nn.ModuleList([
+            SwinTransformerBlock(
+                dim=embed_dim * 2,
+                input_resolution=(4, 6),
+                num_heads=8,
+                window_size=2,
+                shift_size=0,
+                proj_drop=0.025,
+                attn_drop=0.025
+            ),
+            SwinTransformerBlock(
+                dim=embed_dim * 2,
+                input_resolution=(4, 6),
+                num_heads=8,
+                window_size=2,
+                shift_size=1,
+                proj_drop=0.025,
+                attn_drop=0.025
+            )
+        ])
+
+        self.variable_attention = nn.TransformerEncoderLayer(
+            d_model=embed_dim * 2,
+            nhead=8,
+            dim_feedforward=embed_dim * 8,
+            batch_first=True,
+            norm_first=True,
+            dropout=0.05
+        )
+        self.head = nn.Linear(embed_dim * 2, 96)
+
+    def inject_mixed_noise(self, x):
+        """
+        折中版：
+        - 高斯噪声：保持
+        - pulse noise：回滚到原版全 batch x.max()/x.min()
+        - drift noise：保持
+        x: [B*N, L, C]
+        """
+        x_noisy = x.clone()
+        rand_probs = torch.rand_like(x)
+
+        # 1) 20%：高斯噪声
+        gauss_mask = rand_probs < (self.noise_level * 0.2)
+        gauss_noise = torch.randn_like(x) * self.noise_level
+        x_noisy = torch.where(gauss_mask, x_noisy + gauss_noise, x_noisy)
+
+        # 2) 40%：脉冲极值噪声（回滚到原版全局 max/min）
+        pulse_mask = (
+            (rand_probs >= (self.noise_level * 0.2)) &
+            (rand_probs < (self.noise_level * 0.6))
+        )
+        spikes = torch.where(torch.rand_like(x) > 0.5, x.max(), x.min())
+        x_noisy = torch.where(pulse_mask, spikes, x_noisy)
+
+        # 3) 40%：漂移缩放噪声
+        drift_mask = (
+            (rand_probs >= (self.noise_level * 0.6)) &
+            (rand_probs < self.noise_level)
+        )
+        scales = 1.0 + torch.randn_like(x) * self.noise_level
+        x_noisy = torch.where(drift_mask, x_noisy * scales, x_noisy)
+
+        return x_noisy
+
+    def forward(self, x):
+        B, L, N = x.shape
+
+        x = self.revin(x, 'norm')
+
+        x = self.patch_embed(
+            x.permute(0, 2, 1).reshape(B * N, L, 1)
+        ).view(B * N, self.H, self.W, -1)
+
+        x = self.l1_swin1(x)  #swin 1
+
+        if self.training:     #noise_injection
+            x = x + torch.randn_like(x) * self.noise_level * 0.75
+
+        x_clean_target = self.l1_swin2(x)  #swin 2
+
+        if self.training:   
+            x_noisy = self.inject_mixed_noise(x_clean_target.view(B * N, L, -1)) #noise_injection
+        else:
+            x_noisy = x_clean_target.view(B * N, L, -1)
+
+        x_flat, d_loss = self.dae_block(     #dae block
+            x_noisy,
+            x_clean_target.view(B * N, L, -1)
+        )
+        x = x_flat.view(B * N, self.H, self.W, -1)
+
+        x = self.reduction(x.permute(0, 3, 1, 2)).flatten(2).transpose(1, 2)
+        x = self.norm(x).view(-1, 4, 6, 256)
+
+        for blk in self.l2_swins:
+            x = blk(x)
+
+        feat = x.mean(dim=(1, 2)).view(B, N, -1)
+        feat = self.variable_attention(feat)
+        out = self.head(feat).permute(0, 2, 1)
+
+        out = self.revin(out, 'denorm')
+        return out, d_loss
+
+
+# ==========================================
+# 4. Dataset
+# ==========================================
+class ElectricityDataset(Dataset):
+    def __init__(self, csv_path, flag='train', seq_len=96, pred_len=96):
+        assert flag in ['train', 'val', 'test']
+        self.seq_len = seq_len
+        self.pred_len = pred_len
+
+        df_raw = pd.read_csv(csv_path).iloc[:, 1:]
+        data = df_raw.values.astype(np.float32)
+
+        n = len(data)
+        tr = int(n * 0.7)
+        te = int(n * 0.2)
+        val = n - tr - te
+
+        border1s = [0, tr - seq_len, n - te - seq_len]
+        border2s = [tr, tr + val, n]
+        f_idx = {'train': 0, 'val': 1, 'test': 2}[flag]
+
+        self.scaler = StandardScaler()
+        self.scaler.fit(data[:tr])
+
+        data_scaled = self.scaler.transform(data)
+        self.data = data_scaled[border1s[f_idx]:border2s[f_idx]]
+
+    def __getitem__(self, i):
+        s_begin = i
+        s_end = i + self.seq_len
+        r_begin = s_end
+        r_end = r_begin + self.pred_len
+
+        x = self.data[s_begin:s_end]
+        y = self.data[r_begin:r_end]
+
+        return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
+
+    def __len__(self):
+        return len(self.data) - self.seq_len - self.pred_len + 1
+
+
+# ==========================================
+# 5. 评估
+# ==========================================
+@torch.no_grad()
+def evaluate_single_gpu(model_module, data_loader, device):
+    model_module.eval()
+
+    mse_sum = 0.0
+    mae_sum = 0.0
+    n_samples = 0
+
+    for bx, by in data_loader:
+        bx = bx.to(device, non_blocking=True)
+        by = by.to(device, non_blocking=True)
+
+        with autocast(device_type='cuda', dtype=torch.float16):
+            pred, _ = model_module(bx)
+
+        batch_size = bx.size(0)
+        mse_sum += F.mse_loss(pred, by, reduction='mean').item() * batch_size
+        mae_sum += F.l1_loss(pred, by, reduction='mean').item() * batch_size
+        n_samples += batch_size
+
+    return mse_sum / n_samples, mae_sum / n_samples
+
+
+# ==========================================
+# 6. 主程序
+# ==========================================
+def main():
+    seed_everything(42)
+
+    is_distributed = "RANK" in os.environ and "WORLD_SIZE" in os.environ
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+
+    if is_distributed:
+        dist.init_process_group("nccl")
+        torch.cuda.set_device(local_rank)
+        device = torch.device(f"cuda:{local_rank}")
+        world_size = dist.get_world_size()
+        rank = dist.get_rank()
+    else:
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        world_size = 1
+        rank = 0
+
+    print(f"[Rank {rank}] local_rank={local_rank} | device={device} | world_size={world_size}", flush=True)
+
+    dataset_path_file = ".kaggle_path.tmp"
+
+    if rank == 0:
+        if not os.path.exists(dataset_path_file):
+            path = kagglehub.dataset_download("tylerfarnan/itransformer-datasets")
+            with open(dataset_path_file, "w") as f:
+                f.write(path)
+
+    if is_distributed:
+        dist.barrier()
+
+    with open(dataset_path_file, "r") as f:
+        root_path = f.read().strip()
+        csv_p = glob.glob(os.path.join(root_path, "**", "electricity.csv"), recursive=True)[0]
+
+    seq_len = 96
+    pred_len = 96
+    global_bs = 8
+    per_gpu_bs = max(1, global_bs // world_size)
+
+    train_set = ElectricityDataset(csv_p, 'train', seq_len=seq_len, pred_len=pred_len)
+
+    if is_distributed:
+        train_sampler = DistributedSampler(train_set, shuffle=True)
+    else:
+        train_sampler = None
+
+    train_loader = DataLoader(
+        train_set,
+        batch_size=per_gpu_bs if is_distributed else global_bs,
+        sampler=train_sampler,
+        shuffle=(train_sampler is None),
+        num_workers=4,   # Increase num_workers for faster data loading
+        pin_memory=True, # Pin memory for better performance
+        drop_last=False
+    )
+
+    if rank == 0:
+        val_set = ElectricityDataset(csv_p, 'val', seq_len=seq_len, pred_len=pred_len)
+        test_set = ElectricityDataset(csv_p, 'test', seq_len=seq_len, pred_len=pred_len)
+
+        val_loader = DataLoader(
+            val_set,
+            batch_size=global_bs,
+            shuffle=False,
+            num_workers=4,   # Increase num_workers for faster data loading
+            pin_memory=True, # Pin memory for better performance
+            drop_last=False
+        )
+        test_loader = DataLoader(
+            test_set,
+            batch_size=global_bs,
+            shuffle=False,
+            num_workers=4,   # Increase num_workers for faster data loading
+            pin_memory=True, # Pin memory for better performance
+            drop_last=False
+        )
+    else:
+        val_loader = None
+        test_loader = None
+
+    model = Swin_iFold_V6(num_vars=321, embed_dim=128, noise_level=0.025).to(device)
+
+    if is_distributed:
+        model = DDP(model, device_ids=[local_rank], broadcast_buffers=False)
+
+    model_to_eval = model.module if is_distributed else model
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-5)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=30)
+    criterion = nn.HuberLoss(delta=0.5)
+    scaler = GradScaler("cuda")
+
+    if rank == 0:
+        print("=" * 72)
+        print("🚀 Swin-iFold V6 [4卡 A8000 安全版] 启动")
+        print(f"✅ Distributed: {is_distributed}")
+        print("✅ AMP: FP16 + GradScaler")
+        print("✅ RevIN: 样本独立 + 变量独立 + 时间维归一化")
+        print("✅ Val/Test: rank0 单卡评估")
+        print("✅ Pulse noise: 回滚为全 batch x.max()/x.min()")
+        print("✅ DataLoader: num_workers=4")
+        print("=" * 72)
+
+    best_val_mse = float('inf')
+    best_path = "best_v6_hybrid.pth"
+
+    for epoch in range(30):
+        if is_distributed:
+            train_sampler.set_epoch(epoch)
+
+        model.train()
+        epoch_main_loss = 0.0
+        epoch_d_loss = 0.0
+        t0 = time.time()
+
+        for step, (bx, by) in enumerate(train_loader):
+            if step == 0:
+                print(f"[Rank {rank}] first batch shape: bx={bx.shape}, by={by.shape}", flush=True)
+
+            bx = bx.to(device, non_blocking=True)
+            by = by.to(device, non_blocking=True)
+
+            optimizer.zero_grad(set_to_none=True)
+
+            with autocast(device_type='cuda', dtype=torch.float16):
+                pred, d_loss = model(bx)
+                main_loss = criterion(pred, by)
+                total_loss = main_loss + 0.1 * d_loss.mean()
+
+            scaler.scale(total_loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            epoch_main_loss += main_loss.item()
+            epoch_d_loss += d_loss.mean().item()
+
+            if rank == 0 and (step % 200 == 0):
+                print(
+                    f"[Epoch {epoch+1:02d}] step {step}/{len(train_loader)} | "
+                    f"main_loss={main_loss.item():.4f} | d_loss={d_loss.mean().item():.5f}"
+                )
+
+        scheduler.step()
+
+        if is_distributed:
+            dist.barrier()
+
+        if rank == 0:
+            avg_val_mse, avg_val_mae = evaluate_single_gpu(model_to_eval, val_loader, device)
+            avg_m_loss = epoch_main_loss / len(train_loader)
+            avg_d_loss = epoch_d_loss / len(train_loader)
+
+            status = "🌟 New Best" if avg_val_mse < best_val_mse else ""
+            print(
+                f"E{epoch+1:02d} | "
+                f"Time: {time.time()-t0:.1f}s | "
+                f"T-Loss: {avg_m_loss:.4f} | "
+                f"DAE-Loss: {avg_d_loss:.5f} | "
+                f"Val MSE: {avg_val_mse:.6f} | "
+                f"Val MAE: {avg_val_mae:.6f} "
+                f"{status}"
+            )
+
+            if avg_val_mse < best_val_mse:
+                best_val_mse = avg_val_mse
+                torch.save(model_to_eval.state_dict(), best_path)
+
+        if is_distributed:
+            dist.barrier()
+
+    if rank == 0:
+        print(f"\n{'=' * 72}")
+        print(f"🏆 训练结束！加载最佳权重 [{best_path}] 进行终测...")
+        print(f"{'=' * 72}")
+
+    if is_distributed:
+        dist.barrier()
+
+    model_to_eval.load_state_dict(torch.load(best_path, map_location=device))
+
+    if is_distributed:
+        dist.barrier()
+
+    if rank == 0:
+        final_test_mse, final_test_mae = evaluate_single_gpu(model_to_eval, test_loader, device)
+        print("📊 【最终结果】")
+        print(f"🔥 TEST MSE: {final_test_mse:.6f}")
+        print(f"🌟 TEST MAE: {final_test_mae:.6f}")
+        print(f"📉 Best Val MSE: {best_val_mse:.6f}")
+        print("=" * 72)
+
+    if is_distributed:
+        dist.destroy_process_group()
+
+
+if __name__ == "__main__":
+    main()
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+base) root@ubuntu22:~# torchrun --nproc_per_node=4 test.py
+W0319 23:17:06.774000 4176 site-packages/torch/distributed/run.py:793] 
+W0319 23:17:06.774000 4176 site-packages/torch/distributed/run.py:793] *****************************************
+W0319 23:17:06.774000 4176 site-packages/torch/distributed/run.py:793] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0319 23:17:06.774000 4176 site-packages/torch/distributed/run.py:793] *****************************************
+[Rank 2] local_rank=2 | device=cuda:2 | world_size=4
+[rank2]:[W319 23:17:10.206974952 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 2]  using GPU 2 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+[Rank 0] local_rank=0 | device=cuda:0 | world_size=4
+[Rank 3] local_rank=3 | device=cuda:3 | world_size=4
+[Rank 1] local_rank=1 | device=cuda:1 | world_size=4
+[rank1]:[W319 23:17:10.230282820 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 1]  using GPU 1 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+[rank3]:[W319 23:17:10.230294560 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 3]  using GPU 3 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+[rank0]:[W319 23:17:10.278782233 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 0]  using GPU 0 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+========================================================================
+🚀 Swin-iFold V6 [4卡 A8000 安全版] 启动
+✅ Distributed: True
+✅ AMP: FP16 + GradScaler
+✅ RevIN: 样本独立 + 变量独立 + 时间维归一化
+✅ Val/Test: rank0 单卡评估
+✅ Pulse noise: 回滚为全 batch x.max()/x.min()
+✅ DataLoader: num_workers=4
+========================================================================
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 01] step 0/2278 | main_loss=0.3315 | d_loss=1.48063
+[Epoch 01] step 200/2278 | main_loss=0.1121 | d_loss=0.09699
+[Epoch 01] step 400/2278 | main_loss=0.0968 | d_loss=0.07469
+[Epoch 01] step 600/2278 | main_loss=0.0821 | d_loss=0.08103
+[Epoch 01] step 800/2278 | main_loss=0.0795 | d_loss=0.07849
+[Epoch 01] step 1000/2278 | main_loss=0.0710 | d_loss=0.08444
+[Epoch 01] step 1200/2278 | main_loss=0.0574 | d_loss=0.10941
+[Epoch 01] step 1400/2278 | main_loss=0.0922 | d_loss=0.11609
+[Epoch 01] step 1600/2278 | main_loss=0.0666 | d_loss=0.13914
+[Epoch 01] step 1800/2278 | main_loss=0.0591 | d_loss=0.16017
+[Epoch 01] step 2000/2278 | main_loss=0.0562 | d_loss=0.14555
+[Epoch 01] step 2200/2278 | main_loss=0.1143 | d_loss=0.13173
+E01 | Time: 88.0s | T-Loss: 0.0776 | DAE-Loss: 0.11822 | Val MSE: 0.147259 | Val MAE: 0.241607 🌟 New Best
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 02] step 0/2278 | main_loss=0.0537 | d_loss=0.14348
+[Epoch 02] step 200/2278 | main_loss=0.0496 | d_loss=0.15593
+[Epoch 02] step 400/2278 | main_loss=0.0700 | d_loss=0.17230
+[Epoch 02] step 600/2278 | main_loss=0.0562 | d_loss=0.18143
+[Epoch 02] step 800/2278 | main_loss=0.0526 | d_loss=0.17577
+[Epoch 02] step 1000/2278 | main_loss=0.0569 | d_loss=0.14936
+[Epoch 02] step 1200/2278 | main_loss=0.0468 | d_loss=0.17498
+[Epoch 02] step 1400/2278 | main_loss=0.1136 | d_loss=0.20083
+[Epoch 02] step 1600/2278 | main_loss=0.0453 | d_loss=0.20542
+[Epoch 02] step 1800/2278 | main_loss=0.0522 | d_loss=0.24454
+[Epoch 02] step 2000/2278 | main_loss=0.0588 | d_loss=0.27663
+[Epoch 02] step 2200/2278 | main_loss=0.0475 | d_loss=0.27266
+E02 | Time: 87.1s | T-Loss: 0.0602 | DAE-Loss: 0.19975 | Val MSE: 0.133926 | Val MAE: 0.230701 🌟 New Best
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 03] step 0/2278 | main_loss=0.0509 | d_loss=0.27916
+[Epoch 03] step 200/2278 | main_loss=0.0510 | d_loss=0.28595
+[Epoch 03] step 400/2278 | main_loss=0.0446 | d_loss=0.29182
+[Epoch 03] step 600/2278 | main_loss=0.0478 | d_loss=0.27514
+[Epoch 03] step 800/2278 | main_loss=0.0892 | d_loss=0.26815
+[Epoch 03] step 1000/2278 | main_loss=0.0518 | d_loss=0.25314
+[Epoch 03] step 1200/2278 | main_loss=0.0627 | d_loss=0.25067
+[Epoch 03] step 1400/2278 | main_loss=0.0590 | d_loss=0.25516
+[Epoch 03] step 1600/2278 | main_loss=0.0858 | d_loss=0.22346
+[Epoch 03] step 1800/2278 | main_loss=0.0488 | d_loss=0.21830
+[Epoch 03] step 2000/2278 | main_loss=0.0467 | d_loss=0.19376
+[Epoch 03] step 2200/2278 | main_loss=0.0984 | d_loss=0.19472
+E03 | Time: 87.2s | T-Loss: 0.0561 | DAE-Loss: 0.24505 | Val MSE: 0.125442 | Val MAE: 0.220587 🌟 New Best
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 04] step 0/2278 | main_loss=0.0493 | d_loss=0.20355
+[Epoch 04] step 200/2278 | main_loss=0.0468 | d_loss=0.18169
+[Epoch 04] step 400/2278 | main_loss=0.0523 | d_loss=0.18940
+[Epoch 04] step 600/2278 | main_loss=0.0489 | d_loss=0.17773
+[Epoch 04] step 800/2278 | main_loss=0.0487 | d_loss=0.16616
+[Epoch 04] step 1000/2278 | main_loss=0.0589 | d_loss=0.15668
+[Epoch 04] step 1200/2278 | main_loss=0.0456 | d_loss=0.17520
+[Epoch 04] step 1400/2278 | main_loss=0.0506 | d_loss=0.16440
+[Epoch 04] step 1600/2278 | main_loss=0.0512 | d_loss=0.15739
+[Epoch 04] step 1800/2278 | main_loss=0.0647 | d_loss=0.17603
+[Epoch 04] step 2000/2278 | main_loss=0.0585 | d_loss=0.16431
+[Epoch 04] step 2200/2278 | main_loss=0.0436 | d_loss=0.17866
+E04 | Time: 86.8s | T-Loss: 0.0540 | DAE-Loss: 0.17306 | Val MSE: 0.124777 | Val MAE: 0.218428 🌟 New Best
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 05] step 0/2278 | main_loss=0.0388 | d_loss=0.17366
+[Epoch 05] step 200/2278 | main_loss=0.0530 | d_loss=0.17001
+[Epoch 05] step 400/2278 | main_loss=0.0582 | d_loss=0.17485
+[Epoch 05] step 600/2278 | main_loss=0.0523 | d_loss=0.17626
+[Epoch 05] step 800/2278 | main_loss=0.0456 | d_loss=0.15932
+[Epoch 05] step 1000/2278 | main_loss=0.0526 | d_loss=0.15715
+[Epoch 05] step 1200/2278 | main_loss=0.0508 | d_loss=0.14897
+[Epoch 05] step 1400/2278 | main_loss=0.0552 | d_loss=0.14345
+[Epoch 05] step 1600/2278 | main_loss=0.0494 | d_loss=0.13885
+[Epoch 05] step 1800/2278 | main_loss=0.0560 | d_loss=0.12227
+[Epoch 05] step 2000/2278 | main_loss=0.0486 | d_loss=0.12017
+[Epoch 05] step 2200/2278 | main_loss=0.0399 | d_loss=0.10918
+E05 | Time: 86.7s | T-Loss: 0.0527 | DAE-Loss: 0.14901 | Val MSE: 0.122019 | Val MAE: 0.215861 🌟 New Best
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 06] step 0/2278 | main_loss=0.0465 | d_loss=0.10457
+[Epoch 06] step 200/2278 | main_loss=0.0405 | d_loss=0.09324
+[Epoch 06] step 400/2278 | main_loss=0.0513 | d_loss=0.09121
+[Epoch 06] step 600/2278 | main_loss=0.0416 | d_loss=0.08721
+[Epoch 06] step 800/2278 | main_loss=0.0482 | d_loss=0.08254
+[Epoch 06] step 1000/2278 | main_loss=0.0497 | d_loss=0.07837
+[Epoch 06] step 1200/2278 | main_loss=0.0415 | d_loss=0.07219
+[Epoch 06] step 1400/2278 | main_loss=0.0614 | d_loss=0.07122
+[Epoch 06] step 1600/2278 | main_loss=0.0452 | d_loss=0.07320
+[Epoch 06] step 1800/2278 | main_loss=0.1112 | d_loss=0.07297
+[Epoch 06] step 2000/2278 | main_loss=0.0579 | d_loss=0.06735
+[Epoch 06] step 2200/2278 | main_loss=0.0461 | d_loss=0.06986
+E06 | Time: 86.7s | T-Loss: 0.0508 | DAE-Loss: 0.07922 | Val MSE: 0.121039 | Val MAE: 0.215106 🌟 New Best
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 07] step 0/2278 | main_loss=0.0731 | d_loss=0.06571
+[Epoch 07] step 200/2278 | main_loss=0.0441 | d_loss=0.06515
+[Epoch 07] step 400/2278 | main_loss=0.0424 | d_loss=0.06255
+[Epoch 07] step 600/2278 | main_loss=0.0400 | d_loss=0.06132
+[Epoch 07] step 800/2278 | main_loss=0.0528 | d_loss=0.05982
+[Epoch 07] step 1000/2278 | main_loss=0.0570 | d_loss=0.05950
+[Epoch 07] step 1200/2278 | main_loss=0.0394 | d_loss=0.05789
+[Epoch 07] step 1400/2278 | main_loss=0.0434 | d_loss=0.05755
+[Epoch 07] step 1600/2278 | main_loss=0.0426 | d_loss=0.05604
+[Epoch 07] step 1800/2278 | main_loss=0.0567 | d_loss=0.05598
+[Epoch 07] step 2000/2278 | main_loss=0.0439 | d_loss=0.05469
+[Epoch 07] step 2200/2278 | main_loss=0.0383 | d_loss=0.05573
+E07 | Time: 86.8s | T-Loss: 0.0493 | DAE-Loss: 0.05914 | Val MSE: 0.121548 | Val MAE: 0.216373 
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 08] step 0/2278 | main_loss=0.0457 | d_loss=0.05397
+[Epoch 08] step 200/2278 | main_loss=0.0620 | d_loss=0.05550
+[Epoch 08] step 400/2278 | main_loss=0.0406 | d_loss=0.05307
+[Epoch 08] step 600/2278 | main_loss=0.0598 | d_loss=0.05535
+[Epoch 08] step 800/2278 | main_loss=0.0455 | d_loss=0.05342
+[Epoch 08] step 1000/2278 | main_loss=0.0483 | d_loss=0.05506
+[Epoch 08] step 1200/2278 | main_loss=0.0437 | d_loss=0.05200
+[Epoch 08] step 1400/2278 | main_loss=0.0684 | d_loss=0.05115
+[Epoch 08] step 1600/2278 | main_loss=0.0415 | d_loss=0.04991
+[Epoch 08] step 1800/2278 | main_loss=0.0490 | d_loss=0.05159
+[Epoch 08] step 2000/2278 | main_loss=0.0516 | d_loss=0.04985
+[Epoch 08] step 2200/2278 | main_loss=0.0423 | d_loss=0.04803
+E08 | Time: 86.6s | T-Loss: 0.0477 | DAE-Loss: 0.05257 | Val MSE: 0.117345 | Val MAE: 0.211368 🌟 New Best
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 09] step 0/2278 | main_loss=0.0403 | d_loss=0.04806
+[Epoch 09] step 200/2278 | main_loss=0.0383 | d_loss=0.04940
+[Epoch 09] step 400/2278 | main_loss=0.0523 | d_loss=0.04715
+[Epoch 09] step 600/2278 | main_loss=0.0457 | d_loss=0.05161
+[Epoch 09] step 800/2278 | main_loss=0.0512 | d_loss=0.04662
+[Epoch 09] step 1000/2278 | main_loss=0.0926 | d_loss=0.05117
+[Epoch 09] step 1200/2278 | main_loss=0.0472 | d_loss=0.04909
+[Epoch 09] step 1400/2278 | main_loss=0.0416 | d_loss=0.05464
+[Epoch 09] step 1600/2278 | main_loss=0.0488 | d_loss=0.05032
+[Epoch 09] step 1800/2278 | main_loss=0.0652 | d_loss=0.04976
+[Epoch 09] step 2000/2278 | main_loss=0.0450 | d_loss=0.05036
+[Epoch 09] step 2200/2278 | main_loss=0.0433 | d_loss=0.04868
+E09 | Time: 86.6s | T-Loss: 0.0463 | DAE-Loss: 0.04959 | Val MSE: 0.119003 | Val MAE: 0.212680 
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 10] step 0/2278 | main_loss=0.0451 | d_loss=0.05204
+[Epoch 10] step 200/2278 | main_loss=0.0449 | d_loss=0.04962
+[Epoch 10] step 400/2278 | main_loss=0.0499 | d_loss=0.05102
+[Epoch 10] step 600/2278 | main_loss=0.0444 | d_loss=0.05029
+[Epoch 10] step 800/2278 | main_loss=0.0393 | d_loss=0.04946
+[Epoch 10] step 1000/2278 | main_loss=0.0497 | d_loss=0.05012
+[Epoch 10] step 1200/2278 | main_loss=0.0741 | d_loss=0.04944
+[Epoch 10] step 1400/2278 | main_loss=0.0452 | d_loss=0.05087
+[Epoch 10] step 1600/2278 | main_loss=0.0401 | d_loss=0.05086
+[Epoch 10] step 1800/2278 | main_loss=0.0453 | d_loss=0.05260
+[Epoch 10] step 2000/2278 | main_loss=0.0555 | d_loss=0.04957
+[Epoch 10] step 2200/2278 | main_loss=0.0449 | d_loss=0.04939
+E10 | Time: 86.7s | T-Loss: 0.0453 | DAE-Loss: 0.05096 | Val MSE: 0.118515 | Val MAE: 0.211106 
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 11] step 0/2278 | main_loss=0.0448 | d_loss=0.04975
+[Epoch 11] step 200/2278 | main_loss=0.0486 | d_loss=0.05236
+[Epoch 11] step 400/2278 | main_loss=0.0448 | d_loss=0.04985
+[Epoch 11] step 600/2278 | main_loss=0.0592 | d_loss=0.04880
+[Epoch 11] step 800/2278 | main_loss=0.0528 | d_loss=0.04950
+[Epoch 11] step 1000/2278 | main_loss=0.0561 | d_loss=0.04775
+[Epoch 11] step 1200/2278 | main_loss=0.0556 | d_loss=0.04829
+[Epoch 11] step 1400/2278 | main_loss=0.0431 | d_loss=0.04712
+[Epoch 11] step 1600/2278 | main_loss=0.0346 | d_loss=0.04859
+[Epoch 11] step 1800/2278 | main_loss=0.0460 | d_loss=0.04962
+[Epoch 11] step 2000/2278 | main_loss=0.0373 | d_loss=0.04746
+[Epoch 11] step 2200/2278 | main_loss=0.0555 | d_loss=0.04743
+E11 | Time: 86.6s | T-Loss: 0.0441 | DAE-Loss: 0.04943 | Val MSE: 0.116570 | Val MAE: 0.210426 🌟 New Best
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 12] step 0/2278 | main_loss=0.0346 | d_loss=0.04840
+[Epoch 12] step 200/2278 | main_loss=0.0453 | d_loss=0.04665
+[Epoch 12] step 400/2278 | main_loss=0.0434 | d_loss=0.04883
+[Epoch 12] step 600/2278 | main_loss=0.0448 | d_loss=0.04762
+[Epoch 12] step 800/2278 | main_loss=0.0492 | d_loss=0.04715
+[Epoch 12] step 1000/2278 | main_loss=0.0379 | d_loss=0.04646
+[Epoch 12] step 1200/2278 | main_loss=0.0414 | d_loss=0.04842
+[Epoch 12] step 1400/2278 | main_loss=0.0461 | d_loss=0.04771
+[Epoch 12] step 1600/2278 | main_loss=0.0355 | d_loss=0.04799
+[Epoch 12] step 1800/2278 | main_loss=0.0360 | d_loss=0.04794
+[Epoch 12] step 2000/2278 | main_loss=0.0375 | d_loss=0.04749
+[Epoch 12] step 2200/2278 | main_loss=0.0401 | d_loss=0.05104
+E12 | Time: 86.5s | T-Loss: 0.0436 | DAE-Loss: 0.04828 | Val MSE: 0.118121 | Val MAE: 0.210565 
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 13] step 0/2278 | main_loss=0.0422 | d_loss=0.04613
+[Epoch 13] step 200/2278 | main_loss=0.0405 | d_loss=0.04657
+[Epoch 13] step 400/2278 | main_loss=0.0560 | d_loss=0.04539
+[Epoch 13] step 600/2278 | main_loss=0.0406 | d_loss=0.05168
+[Epoch 13] step 800/2278 | main_loss=0.0379 | d_loss=0.04693
+[Epoch 13] step 1000/2278 | main_loss=0.0358 | d_loss=0.04468
+[Epoch 13] step 1200/2278 | main_loss=0.0422 | d_loss=0.04697
+[Epoch 13] step 1400/2278 | main_loss=0.0358 | d_loss=0.04489
+[Epoch 13] step 1600/2278 | main_loss=0.0578 | d_loss=0.04284
+[Epoch 13] step 1800/2278 | main_loss=0.0398 | d_loss=0.04184
+[Epoch 13] step 2000/2278 | main_loss=0.0356 | d_loss=0.04721
+[Epoch 13] step 2200/2278 | main_loss=0.0549 | d_loss=0.04409
+E13 | Time: 86.4s | T-Loss: 0.0427 | DAE-Loss: 0.04569 | Val MSE: 0.115597 | Val MAE: 0.207859 🌟 New Best
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 14] step 0/2278 | main_loss=0.0336 | d_loss=0.04502
+[Epoch 14] step 200/2278 | main_loss=0.0453 | d_loss=0.04157
+[Epoch 14] step 400/2278 | main_loss=0.0416 | d_loss=0.04006
+[Epoch 14] step 600/2278 | main_loss=0.0414 | d_loss=0.03956
+[Epoch 14] step 800/2278 | main_loss=0.0446 | d_loss=0.04132
+[Epoch 14] step 1000/2278 | main_loss=0.0530 | d_loss=0.04052
+[Epoch 14] step 1200/2278 | main_loss=0.0360 | d_loss=0.04066
+[Epoch 14] step 1400/2278 | main_loss=0.0382 | d_loss=0.04200
+[Epoch 14] step 1600/2278 | main_loss=0.0438 | d_loss=0.03999
+[Epoch 14] step 1800/2278 | main_loss=0.0519 | d_loss=0.03803
+[Epoch 14] step 2000/2278 | main_loss=0.0414 | d_loss=0.03850
+[Epoch 14] step 2200/2278 | main_loss=0.0410 | d_loss=0.03919
+E14 | Time: 86.5s | T-Loss: 0.0421 | DAE-Loss: 0.03988 | Val MSE: 0.115851 | Val MAE: 0.208054 
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 15] step 0/2278 | main_loss=0.0445 | d_loss=0.03793
+[Epoch 15] step 200/2278 | main_loss=0.0404 | d_loss=0.03765
+[Epoch 15] step 400/2278 | main_loss=0.0344 | d_loss=0.03789
+[Epoch 15] step 600/2278 | main_loss=0.0390 | d_loss=0.03714
+[Epoch 15] step 800/2278 | main_loss=0.0447 | d_loss=0.03716
+[Epoch 15] step 1000/2278 | main_loss=0.0378 | d_loss=0.03685
+[Epoch 15] step 1200/2278 | main_loss=0.0456 | d_loss=0.03690
+[Epoch 15] step 1400/2278 | main_loss=0.0368 | d_loss=0.03676
+[Epoch 15] step 1600/2278 | main_loss=0.0511 | d_loss=0.03638
+[Epoch 15] step 1800/2278 | main_loss=0.0367 | d_loss=0.03792
+[Epoch 15] step 2000/2278 | main_loss=0.0383 | d_loss=0.03558
+[Epoch 15] step 2200/2278 | main_loss=0.0467 | d_loss=0.03528
+E15 | Time: 86.5s | T-Loss: 0.0416 | DAE-Loss: 0.03706 | Val MSE: 0.114715 | Val MAE: 0.207255 🌟 New Best
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 16] step 0/2278 | main_loss=0.0448 | d_loss=0.03797
+[Epoch 16] step 200/2278 | main_loss=0.0378 | d_loss=0.03539
+[Epoch 16] step 400/2278 | main_loss=0.0359 | d_loss=0.03445
+[Epoch 16] step 600/2278 | main_loss=0.0500 | d_loss=0.03475
+[Epoch 16] step 800/2278 | main_loss=0.0420 | d_loss=0.03653
+[Epoch 16] step 1000/2278 | main_loss=0.0378 | d_loss=0.03497
+[Epoch 16] step 1200/2278 | main_loss=0.0422 | d_loss=0.03511
+[Epoch 16] step 1400/2278 | main_loss=0.0499 | d_loss=0.03583
+[Epoch 16] step 1600/2278 | main_loss=0.0339 | d_loss=0.03466
+[Epoch 16] step 1800/2278 | main_loss=0.0477 | d_loss=0.03515
+[Epoch 16] step 2000/2278 | main_loss=0.0396 | d_loss=0.03493
+[Epoch 16] step 2200/2278 | main_loss=0.0362 | d_loss=0.03458
+E16 | Time: 86.5s | T-Loss: 0.0408 | DAE-Loss: 0.03528 | Val MSE: 0.115497 | Val MAE: 0.207146 
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 17] step 0/2278 | main_loss=0.0443 | d_loss=0.03557
+[Epoch 17] step 200/2278 | main_loss=0.0367 | d_loss=0.03459
+[Epoch 17] step 400/2278 | main_loss=0.0561 | d_loss=0.03441
+[Epoch 17] step 600/2278 | main_loss=0.0418 | d_loss=0.03406
+[Epoch 17] step 800/2278 | main_loss=0.0448 | d_loss=0.03356
+[Epoch 17] step 1000/2278 | main_loss=0.0425 | d_loss=0.03362
+[Epoch 17] step 1200/2278 | main_loss=0.0458 | d_loss=0.03439
+[Epoch 17] step 1400/2278 | main_loss=0.0331 | d_loss=0.03415
+[Epoch 17] step 1600/2278 | main_loss=0.0407 | d_loss=0.03473
+[Epoch 17] step 1800/2278 | main_loss=0.0446 | d_loss=0.03477
+[Epoch 17] step 2000/2278 | main_loss=0.0412 | d_loss=0.03431
+[Epoch 17] step 2200/2278 | main_loss=0.0329 | d_loss=0.03423
+E17 | Time: 86.5s | T-Loss: 0.0402 | DAE-Loss: 0.03452 | Val MSE: 0.115211 | Val MAE: 0.207355 
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 18] step 0/2278 | main_loss=0.0420 | d_loss=0.03422
+[Epoch 18] step 200/2278 | main_loss=0.0370 | d_loss=0.03467
+[Epoch 18] step 400/2278 | main_loss=0.0364 | d_loss=0.03414
+[Epoch 18] step 600/2278 | main_loss=0.0448 | d_loss=0.03455
+[Epoch 18] step 800/2278 | main_loss=0.0416 | d_loss=0.03406
+[Epoch 18] step 1000/2278 | main_loss=0.0446 | d_loss=0.03405
+[Epoch 18] step 1200/2278 | main_loss=0.0426 | d_loss=0.03524
+[Epoch 18] step 1400/2278 | main_loss=0.0333 | d_loss=0.03419
+[Epoch 18] step 1600/2278 | main_loss=0.0373 | d_loss=0.03356
+[Epoch 18] step 1800/2278 | main_loss=0.0389 | d_loss=0.03423
+[Epoch 18] step 2000/2278 | main_loss=0.0421 | d_loss=0.03377
+[Epoch 18] step 2200/2278 | main_loss=0.0491 | d_loss=0.03411
+E18 | Time: 86.4s | T-Loss: 0.0399 | DAE-Loss: 0.03419 | Val MSE: 0.114348 | Val MAE: 0.206324 🌟 New Best
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 19] step 0/2278 | main_loss=0.0435 | d_loss=0.03377
+[Epoch 19] step 200/2278 | main_loss=0.0352 | d_loss=0.03346
+[Epoch 19] step 400/2278 | main_loss=0.0352 | d_loss=0.03442
+[Epoch 19] step 600/2278 | main_loss=0.0374 | d_loss=0.03351
+[Epoch 19] step 800/2278 | main_loss=0.0526 | d_loss=0.03401
+[Epoch 19] step 1000/2278 | main_loss=0.0338 | d_loss=0.03353
+[Epoch 19] step 1200/2278 | main_loss=0.0357 | d_loss=0.03287
+[Epoch 19] step 1400/2278 | main_loss=0.0391 | d_loss=0.03329
+[Epoch 19] step 1600/2278 | main_loss=0.0425 | d_loss=0.03340
+[Epoch 19] step 1800/2278 | main_loss=0.0329 | d_loss=0.03328
+[Epoch 19] step 2000/2278 | main_loss=0.0410 | d_loss=0.03306
+[Epoch 19] step 2200/2278 | main_loss=0.0385 | d_loss=0.03257
+E19 | Time: 86.4s | T-Loss: 0.0395 | DAE-Loss: 0.03341 | Val MSE: 0.114253 | Val MAE: 0.206620 🌟 New Best
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 20] step 0/2278 | main_loss=0.0366 | d_loss=0.03332
+[Epoch 20] step 200/2278 | main_loss=0.0541 | d_loss=0.03335
+[Epoch 20] step 400/2278 | main_loss=0.0388 | d_loss=0.03331
+[Epoch 20] step 600/2278 | main_loss=0.0333 | d_loss=0.03336
+[Epoch 20] step 800/2278 | main_loss=0.0436 | d_loss=0.03333
+[Epoch 20] step 1000/2278 | main_loss=0.0405 | d_loss=0.03295
+[Epoch 20] step 1200/2278 | main_loss=0.0392 | d_loss=0.03243
+[Epoch 20] step 1400/2278 | main_loss=0.0392 | d_loss=0.03301
+[Epoch 20] step 1600/2278 | main_loss=0.0341 | d_loss=0.03316
+[Epoch 20] step 1800/2278 | main_loss=0.0363 | d_loss=0.03282
+[Epoch 20] step 2000/2278 | main_loss=0.0369 | d_loss=0.03196
+[Epoch 20] step 2200/2278 | main_loss=0.0411 | d_loss=0.03257
+E20 | Time: 86.5s | T-Loss: 0.0392 | DAE-Loss: 0.03291 | Val MSE: 0.114061 | Val MAE: 0.205536 🌟 New Best
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 21] step 0/2278 | main_loss=0.0427 | d_loss=0.03258
+[Epoch 21] step 200/2278 | main_loss=0.0389 | d_loss=0.03265
+[Epoch 21] step 400/2278 | main_loss=0.0323 | d_loss=0.03207
+[Epoch 21] step 600/2278 | main_loss=0.0307 | d_loss=0.03245
+[Epoch 21] step 800/2278 | main_loss=0.0282 | d_loss=0.03179
+[Epoch 21] step 1000/2278 | main_loss=0.0352 | d_loss=0.03214
+[Epoch 21] step 1200/2278 | main_loss=0.0421 | d_loss=0.03212
+[Epoch 21] step 1400/2278 | main_loss=0.0345 | d_loss=0.03170
+[Epoch 21] step 1600/2278 | main_loss=0.0459 | d_loss=0.03268
+[Epoch 21] step 1800/2278 | main_loss=0.0389 | d_loss=0.03182
+[Epoch 21] step 2000/2278 | main_loss=0.0353 | d_loss=0.03246
+[Epoch 21] step 2200/2278 | main_loss=0.0451 | d_loss=0.03304
+E21 | Time: 86.3s | T-Loss: 0.0387 | DAE-Loss: 0.03235 | Val MSE: 0.114026 | Val MAE: 0.205547 🌟 New Best
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 22] step 0/2278 | main_loss=0.0355 | d_loss=0.03284
+[Epoch 22] step 200/2278 | main_loss=0.0397 | d_loss=0.03194
+[Epoch 22] step 400/2278 | main_loss=0.0398 | d_loss=0.03188
+[Epoch 22] step 600/2278 | main_loss=0.0417 | d_loss=0.03179
+[Epoch 22] step 800/2278 | main_loss=0.0308 | d_loss=0.03220
+[Epoch 22] step 1000/2278 | main_loss=0.0422 | d_loss=0.03184
+[Epoch 22] step 1200/2278 | main_loss=0.0438 | d_loss=0.03181
+[Epoch 22] step 1400/2278 | main_loss=0.0355 | d_loss=0.03190
+[Epoch 22] step 1600/2278 | main_loss=0.0349 | d_loss=0.03266
+[Epoch 22] step 1800/2278 | main_loss=0.0284 | d_loss=0.03150
+[Epoch 22] step 2000/2278 | main_loss=0.0358 | d_loss=0.03162
+[Epoch 22] step 2200/2278 | main_loss=0.0376 | d_loss=0.03159
+E22 | Time: 86.3s | T-Loss: 0.0385 | DAE-Loss: 0.03192 | Val MSE: 0.115067 | Val MAE: 0.207424 
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 23] step 0/2278 | main_loss=0.0377 | d_loss=0.03159
+[Epoch 23] step 200/2278 | main_loss=0.0418 | d_loss=0.03146
+[Epoch 23] step 400/2278 | main_loss=0.0320 | d_loss=0.03145
+[Epoch 23] step 600/2278 | main_loss=0.0332 | d_loss=0.03155
+[Epoch 23] step 800/2278 | main_loss=0.0414 | d_loss=0.03199
+[Epoch 23] step 1000/2278 | main_loss=0.0421 | d_loss=0.03144
+[Epoch 23] step 1200/2278 | main_loss=0.0353 | d_loss=0.03130
+[Epoch 23] step 1400/2278 | main_loss=0.0353 | d_loss=0.03171
+[Epoch 23] step 1600/2278 | main_loss=0.0382 | d_loss=0.03146
+[Epoch 23] step 1800/2278 | main_loss=0.0421 | d_loss=0.03080
+[Epoch 23] step 2000/2278 | main_loss=0.0391 | d_loss=0.03136
+[Epoch 23] step 2200/2278 | main_loss=0.0377 | d_loss=0.03111
+E23 | Time: 86.4s | T-Loss: 0.0382 | DAE-Loss: 0.03163 | Val MSE: 0.113680 | Val MAE: 0.205342 🌟 New Best
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 24] step 0/2278 | main_loss=0.0328 | d_loss=0.03165
+[Epoch 24] step 200/2278 | main_loss=0.0354 | d_loss=0.03702
+[Epoch 24] step 400/2278 | main_loss=0.0399 | d_loss=0.03100
+[Epoch 24] step 600/2278 | main_loss=0.0489 | d_loss=0.03147
+[Epoch 24] step 800/2278 | main_loss=0.0421 | d_loss=0.03287
+[Epoch 24] step 1000/2278 | main_loss=0.0345 | d_loss=0.03106
+[Epoch 24] step 1200/2278 | main_loss=0.0351 | d_loss=0.03159
+[Epoch 24] step 1400/2278 | main_loss=0.0377 | d_loss=0.03110
+[Epoch 24] step 1600/2278 | main_loss=0.0390 | d_loss=0.03141
+[Epoch 24] step 1800/2278 | main_loss=0.0321 | d_loss=0.03122
+[Epoch 24] step 2000/2278 | main_loss=0.0403 | d_loss=0.03046
+[Epoch 24] step 2200/2278 | main_loss=0.0353 | d_loss=0.03053
+E24 | Time: 86.4s | T-Loss: 0.0379 | DAE-Loss: 0.03133 | Val MSE: 0.114039 | Val MAE: 0.205625 
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 25] step 0/2278 | main_loss=0.0500 | d_loss=0.03079
+[Epoch 25] step 200/2278 | main_loss=0.0406 | d_loss=0.03127
+[Epoch 25] step 400/2278 | main_loss=0.0310 | d_loss=0.03077
+[Epoch 25] step 600/2278 | main_loss=0.0389 | d_loss=0.03119
+[Epoch 25] step 800/2278 | main_loss=0.0420 | d_loss=0.03128
+[Epoch 25] step 1000/2278 | main_loss=0.0351 | d_loss=0.03086
+[Epoch 25] step 1200/2278 | main_loss=0.0374 | d_loss=0.03133
+[Epoch 25] step 1400/2278 | main_loss=0.0358 | d_loss=0.03089
+[Epoch 25] step 1600/2278 | main_loss=0.0391 | d_loss=0.03057
+[Epoch 25] step 1800/2278 | main_loss=0.0336 | d_loss=0.03049
+[Epoch 25] step 2000/2278 | main_loss=0.0317 | d_loss=0.03053
+[Epoch 25] step 2200/2278 | main_loss=0.0331 | d_loss=0.03110
+E25 | Time: 86.8s | T-Loss: 0.0377 | DAE-Loss: 0.03097 | Val MSE: 0.113768 | Val MAE: 0.205323 
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 26] step 0/2278 | main_loss=0.0359 | d_loss=0.03066
+[Epoch 26] step 200/2278 | main_loss=0.0489 | d_loss=0.03079
+[Epoch 26] step 400/2278 | main_loss=0.0342 | d_loss=0.03079
+[Epoch 26] step 600/2278 | main_loss=0.0358 | d_loss=0.03028
+[Epoch 26] step 800/2278 | main_loss=0.0343 | d_loss=0.03066
+[Epoch 26] step 1000/2278 | main_loss=0.0410 | d_loss=0.03009
+[Epoch 26] step 1200/2278 | main_loss=0.0361 | d_loss=0.03077
+[Epoch 26] step 1400/2278 | main_loss=0.0338 | d_loss=0.03031
+[Epoch 26] step 1600/2278 | main_loss=0.0355 | d_loss=0.03060
+[Epoch 26] step 1800/2278 | main_loss=0.0373 | d_loss=0.02989
+[Epoch 26] step 2000/2278 | main_loss=0.0481 | d_loss=0.03069
+[Epoch 26] step 2200/2278 | main_loss=0.0345 | d_loss=0.03055
+E26 | Time: 86.8s | T-Loss: 0.0377 | DAE-Loss: 0.03064 | Val MSE: 0.113806 | Val MAE: 0.205518 
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 27] step 0/2278 | main_loss=0.0429 | d_loss=0.03016
+[Epoch 27] step 200/2278 | main_loss=0.0317 | d_loss=0.03021
+[Epoch 27] step 400/2278 | main_loss=0.0360 | d_loss=0.03088
+[Epoch 27] step 600/2278 | main_loss=0.0373 | d_loss=0.03007
+[Epoch 27] step 800/2278 | main_loss=0.0378 | d_loss=0.03051
+[Epoch 27] step 1000/2278 | main_loss=0.0331 | d_loss=0.02999
+[Epoch 27] step 1200/2278 | main_loss=0.0321 | d_loss=0.03466
+[Epoch 27] step 1400/2278 | main_loss=0.0468 | d_loss=0.03105
+[Epoch 27] step 1600/2278 | main_loss=0.0393 | d_loss=0.03059
+[Epoch 27] step 1800/2278 | main_loss=0.0357 | d_loss=0.03072
+[Epoch 27] step 2000/2278 | main_loss=0.0366 | d_loss=0.03018
+[Epoch 27] step 2200/2278 | main_loss=0.0393 | d_loss=0.03046
+E27 | Time: 86.4s | T-Loss: 0.0376 | DAE-Loss: 0.03044 | Val MSE: 0.113685 | Val MAE: 0.205286 
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 28] step 0/2278 | main_loss=0.0337 | d_loss=0.03005
+[Epoch 28] step 200/2278 | main_loss=0.0356 | d_loss=0.03030
+[Epoch 28] step 400/2278 | main_loss=0.0350 | d_loss=0.03002
+[Epoch 28] step 600/2278 | main_loss=0.0401 | d_loss=0.02973
+[Epoch 28] step 800/2278 | main_loss=0.0357 | d_loss=0.03021
+[Epoch 28] step 1000/2278 | main_loss=0.0389 | d_loss=0.03039
+[Epoch 28] step 1200/2278 | main_loss=0.0361 | d_loss=0.03034
+[Epoch 28] step 1400/2278 | main_loss=0.0519 | d_loss=0.03017
+[Epoch 28] step 1600/2278 | main_loss=0.0396 | d_loss=0.02982
+[Epoch 28] step 1800/2278 | main_loss=0.0319 | d_loss=0.02972
+[Epoch 28] step 2000/2278 | main_loss=0.0302 | d_loss=0.02994
+[Epoch 28] step 2200/2278 | main_loss=0.0349 | d_loss=0.03006
+E28 | Time: 86.5s | T-Loss: 0.0374 | DAE-Loss: 0.03025 | Val MSE: 0.113589 | Val MAE: 0.205224 🌟 New Best
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 29] step 0/2278 | main_loss=0.0321 | d_loss=0.03003
+[Epoch 29] step 200/2278 | main_loss=0.0343 | d_loss=0.02936
+[Epoch 29] step 400/2278 | main_loss=0.0335 | d_loss=0.03042
+[Epoch 29] step 600/2278 | main_loss=0.0442 | d_loss=0.02951
+[Epoch 29] step 800/2278 | main_loss=0.0328 | d_loss=0.02966
+[Epoch 29] step 1000/2278 | main_loss=0.0406 | d_loss=0.02981
+[Epoch 29] step 1200/2278 | main_loss=0.0424 | d_loss=0.03071
+[Epoch 29] step 1400/2278 | main_loss=0.0307 | d_loss=0.02990
+[Epoch 29] step 1600/2278 | main_loss=0.0397 | d_loss=0.03045
+[Epoch 29] step 1800/2278 | main_loss=0.0300 | d_loss=0.03057
+[Epoch 29] step 2000/2278 | main_loss=0.0310 | d_loss=0.03047
+[Epoch 29] step 2200/2278 | main_loss=0.0310 | d_loss=0.02972
+E29 | Time: 86.4s | T-Loss: 0.0374 | DAE-Loss: 0.03017 | Val MSE: 0.113668 | Val MAE: 0.205221 
+[Rank 0] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 3] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 1] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Rank 2] first batch shape: bx=torch.Size([2, 96, 321]), by=torch.Size([2, 96, 321])
+[Epoch 30] step 0/2278 | main_loss=0.0407 | d_loss=0.02992
+[Epoch 30] step 200/2278 | main_loss=0.0425 | d_loss=0.03018
+[Epoch 30] step 400/2278 | main_loss=0.0413 | d_loss=0.03004
+[Epoch 30] step 600/2278 | main_loss=0.0310 | d_loss=0.03054
+[Epoch 30] step 800/2278 | main_loss=0.0313 | d_loss=0.02976
+[Epoch 30] step 1000/2278 | main_loss=0.0455 | d_loss=0.03011
+[Epoch 30] step 1200/2278 | main_loss=0.0402 | d_loss=0.03016
+[Epoch 30] step 1400/2278 | main_loss=0.0381 | d_loss=0.03041
+[Epoch 30] step 1600/2278 | main_loss=0.0363 | d_loss=0.02975
+[Epoch 30] step 1800/2278 | main_loss=0.0401 | d_loss=0.03016
+[Epoch 30] step 2000/2278 | main_loss=0.0380 | d_loss=0.02986
+[Epoch 30] step 2200/2278 | main_loss=0.0333 | d_loss=0.02979
+E30 | Time: 86.5s | T-Loss: 0.0374 | DAE-Loss: 0.03012 | Val MSE: 0.113609 | Val MAE: 0.205182 
+
+========================================================================
+🏆 训练结束！加载最佳权重 [best_v6_hybrid.pth] 进行终测...
+========================================================================
+/root/test.py:518: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  model_to_eval.load_state_dict(torch.load(best_path, map_location=device))
+/root/test.py:518: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  model_to_eval.load_state_dict(torch.load(best_path, map_location=device))
+/root/test.py:518: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  model_to_eval.load_state_dict(torch.load(best_path, map_location=device))
+/root/test.py:518: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  model_to_eval.load_state_dict(torch.load(best_path, map_location=device))
+📊 【最终结果】
+🔥 TEST MSE: 0.136210
+🌟 TEST MAE: 0.229517
+📉 Best Val MSE: 0.113589
+========================================================================
 
 
 
